@@ -1,0 +1,35 @@
+run-title: Harlow_0
+seed: 1111
+save-path: ckpt
+save-interval: 15_000
+resume: false
+start-episode: 15_000
+train: true
+test: true
+mode: episodic # {incremental, episodic}
+
+task:
+  imsize: 34
+
+
+  train-episodes: 100_000 
+  trials-per-epi: 6 # 3600 steps
+  test-episodes: 500
+
+agent:
+  mem-units: 48
+  dict-len: 100_000
+  dict-kernel: cosine
+
+  n-workers: 32
+  
+  value-loss-weight: 0.4
+  entropy-weight: 0.001
+  max-grad-norm: 999.
+  
+  gamma: .91
+  lr: 7.5e-4
+  weight-decay: 0
+
+  lstm-unroll: 100
+
