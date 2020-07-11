@@ -2,8 +2,6 @@ import os
 import yaml
 import pickle
 import argparse
-import datetime
-import scipy.signal
 
 import numpy as np
 import torch as T
@@ -13,8 +11,10 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm 
 from collections import namedtuple
 
-from models.a2c_dnd_lstm import A2C_DND_LSTM
-from tasks.ep_two_step import EpTwoStepTask
+import deepmind_lab as lab 
+
+from harlow import HarlowWrapper
+# from models.a3c_dnd_lstm import A3C_DND_LSTM
 
 Rollout = namedtuple('Rollout',
                         ('state', 'action', 'reward', 'timestep', 'done', 'policy', 'value'))
@@ -29,14 +29,8 @@ class Trainer:
         np.random.seed(config["seed"])
         T.random.manual_seed(config["seed"])
 
-        self.env = EpTwoStepTask(config["task"])  
-        self.agent = A2C_DND_LSTM(
-            self.env.feat_size,
-            config["agent"]["mem-units"], 
-            self.env.num_actions,
-            config["agent"]["dict-len"],
-            config["agent"]["dict-kernel"]
-        ).to(self.device)
+        self.env = None 
+        self.agent = None 
 
         self.optim = T.optim.RMSprop(self.agent.parameters(), lr=config["agent"]["lr"])
 
@@ -46,7 +40,7 @@ class Trainer:
         self.switch_p = config["task"]["swtich-prob"]
         self.start_episode = 0
 
-        self.writer = SummaryWriter(log_dir=os.path.join("logs_ep", config["run-title"]))
+        self.writer = SummaryWriter(log_dir=os.path.join("logs", config["run-title"]))
         self.save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
 
         if config["resume"]:
@@ -68,15 +62,6 @@ class Trainer:
         buffer = []
 
         while not done:
-
-            # switch reward contingencies at the beginning of each episode with probability p
-            self.env.possible_switch(switch_p=self.switch_p)
-
-            trial = self.env.get_trial()
-            if trial == "cued" and self.mode == "episodic":
-                self.agent.turn_on_retrieval()
-            else:
-                self.agent.turn_off_retrieval() 
 
             cue = self.env.get_cue()
             cue = T.tensor(cue, device=self.device)
@@ -222,47 +207,81 @@ class Trainer:
             avg_reward = total_rewards[max(0, episode-10):(episode+1)].mean()            
             progress.set_description(f"Episode {episode}/{num_episodes} | Reward: {reward} | Last 10: {avg_reward:.4f}")
 
-        if self.mode == "incremental":
-            self.env.plot(self.save_path.format(epi=self.seed) + "_uncued", self.env.transition_count_uncued, "Incremental Uncued", y_lim=0)
-            self.env.plot(self.save_path.format(epi=self.seed) + "_cued", self.env.transition_count_cued, "Incremental Cued", y_lim=0)
-        elif self.mode == "episodic":
-            self.env.plot(self.save_path.format(epi=self.seed) + "_episodic", self.env.transition_count_episodic, "Episodic", y_lim=0)
-
-        return self.env.total_reward_cued, self.env.total_reward_uncued
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Paramaters')
-    parser.add_argument('-c', '--config',  type=str, default="configs/ep_two_step.yaml", help='path of config file')
+    parser.add_argument('-c', '--config',  type=str, 
+                        default="/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/config.yaml", 
+                        help='path of config file')
+    parser.add_argument('--length', type=int, default=3600,
+                        help='Number of steps to run the agent')
+    parser.add_argument('--width', type=int, default=84,
+                        help='Horizontal size of the observations')
+    parser.add_argument('--height', type=int, default=84,
+                        help='Vertical size of the observations')
+    parser.add_argument('--fps', type=int, default=60,
+                        help='Number of frames per second')
+    parser.add_argument('--runfiles_path', type=str, default=None,
+                        help='Set the runfiles path to find DeepMind Lab data')
+    parser.add_argument('--level_script', type=str,
+                        default='contributed/psychlab/harlow',
+                        help='The environment level script to load')
+    parser.add_argument('--record', type=str, default=None,
+                        help='Record the run to a demo file')
+    parser.add_argument('--demo', type=str, default=None,
+                        help='Play back a recorded demo file')
+    parser.add_argument('--demofiles', type=str, default=None,
+                        help='Directory for demo files')
+    parser.add_argument('--video', type=str, default=None,
+                        help='Record the demo run as a video')
+
     args = parser.parse_args()
 
     with open(args.config, 'r', encoding="utf-8") as fin:
         config = yaml.load(fin, Loader=yaml.FullLoader)
 
-    n_seeds = 1
-    base_seed = config["seed"]
-    base_run_title = config["run-title"]
+    task_config = {
+        'fps': str(args.fps),
+        'width': str(args.width),
+        'height': str(args.height)
+    }
 
-    reward_cued = np.zeros(n_seeds)
-    reward_uncued = np.zeros(n_seeds)
+    if args.record:
+        task_config['record'] = args.record
+    if args.demo:
+        task_config['demo'] = args.demo
+    if args.demofiles:
+        task_config['demofiles'] = args.demofiles
+    if args.video:
+        task_config['video'] = args.video
 
-    for seed_idx in range(1, n_seeds + 1):
-        config["run-title"] = base_run_title + f"_{seed_idx}"
-        config["seed"] = base_seed * seed_idx
+
+    env = HarlowWrapper(lab.Lab(args.level_script, ['RGB_INTERLEAVED'], config=task_config), args.length)
+    state = env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+
+
+    # for i in range(5):
+    #     _, r_, _, _ = env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc))
+
+    # n_seeds = 1
+    # base_seed = config["seed"]
+    # base_run_title = config["run-title"]
+    # for seed_idx in range(1, n_seeds + 1):
+    #     config["run-title"] = base_run_title + f"_{seed_idx}"
+    #     config["seed"] = base_seed * seed_idx
         
-        exp_path = os.path.join(config["save-path"], config["run-title"])
-        if not os.path.isdir(exp_path): 
-            os.mkdir(exp_path)
+    #     exp_path = os.path.join(config["save-path"], config["run-title"])
+    #     if not os.path.isdir(exp_path): 
+    #         os.mkdir(exp_path)
         
-        out_path = os.path.join(exp_path, os.path.basename(args.config))
-        with open(out_path, 'w') as fout:
-            yaml.dump(config, fout)
+    #     out_path = os.path.join(exp_path, os.path.basename(args.config))
+    #     with open(out_path, 'w') as fout:
+    #         yaml.dump(config, fout)
 
-        print(f"> Running {config['run-title']}")
-        trainer = Trainer(config)
-        if config["train"]:
-            trainer.train(config["task"]["train-episodes"], config["agent"]["gamma"], config["save-interval"])
-        if config["test"]:
-            reward_cued[seed_idx-1], reward_uncued[seed_idx-1] = trainer.test(config["task"]["test-episodes"])
+    #     print(f"> Running {config['run-title']}")
+    #     if config["train"]:
+    #         trainer.train(config["task"]["train-episodes"], config["agent"]["gamma"], config["save-interval"])
+    #     if config["test"]:
+    #         reward_cued[seed_idx-1], reward_uncued[seed_idx-1] = trainer.test(config["task"]["test-episodes"])
 
     

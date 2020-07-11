@@ -17,7 +17,7 @@ task:
   test-episodes: 500
 
 agent:
-  mem-units: 48
+  mem-units: 256
   dict-len: 100_000
   dict-kernel: cosine
 

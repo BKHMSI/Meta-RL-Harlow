@@ -7,11 +7,11 @@ from torch.autograd import Variable
 
 class A3C_LSTM(nn.Module):
 
-    def __init__(self, config, input_dim, num_actions):
+    def __init__(self, config, num_actions):
         super(A3C_LSTM, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Conv2d(input_dim, 16, kernel_size=(8, 8), stride=(4, 4)),
+            nn.Conv2d(3, 16, kernel_size=(8, 8), stride=(4, 4)),
             nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)),
             nn.Flatten(),
             nn.Linear(32, 256),
