@@ -10,35 +10,35 @@ class HarlowWrapper:
   Args:
       env (deepmind_lab.Lab): DeepMind Lab environment.
   """
-  def __init__(self, env, max_length):
+  def __init__(self, env, config):
     self.env = env
-    self.max_length = max_length
+    self.max_length = config["max-length"]
+    self.num_trials = config["num-trials"]
+    self.num_actions = 3 # {no-op, left, right}
     self.frames = []
     self.reset()
 
-  def step(self, action):
-    tmp_obs = self.env.observations()
-    reward = self.env.step(np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.intc), num_steps=1)
-    self.frames.append(tmp_obs['RGB_INTERLEAVED'])
+  def step(self, action, repeat=4):
     
-    done = not self.env.is_running() or self.env.num_steps() > self.max_length
-    if done:
-      self.reset()
+    action_vec = self._create_action(action)
     
-    print("\033[34mAction Taken: " + ("Left" if action[0] > 0 else "Right") + "\033[0m")
-
     obs = self.env.observations()
-    reward += self.env.step(action, num_steps=1)
-    self.frames.append(obs['RGB_INTERLEAVED'])
+    reward = self.env.step(action_vec, num_steps=repeat)
+    self.frames += [obs['RGB_INTERLEAVED']]
 
-    if reward > 0:
-        print("\033[1;32mTrial reward: " + str(reward) + " :)\033[0m")
-    else:
-        print("\033[1;31mTrial reward: " + str(reward) + " :(\033[0m")
-    return obs['RGB_INTERLEAVED'], reward, done, self.env.num_steps()
+    timestep = self.env.num_steps() 
+    done = not self.env.is_running() or timestep > self.max_length
+
+    return obs['RGB_INTERLEAVED'], reward, done, timestep
 
   def reset(self):
     self.env.reset()
     obs = self.env.observations()
     self.frames = []
     return obs['RGB_INTERLEAVED']
+
+  def _create_action(self, action):
+    """
+      action: no-op (0), left (1), right(-1)
+    """
+    return np.array([action,0,0,0,0,0,0])
