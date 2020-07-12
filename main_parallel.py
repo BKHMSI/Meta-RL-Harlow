@@ -85,19 +85,60 @@ if __name__ == "__main__":
         with open(out_path, 'w') as fout:
             yaml.dump(config, fout)
 
+        ############## Start Here ##############
         print(f"> Running {config['run-title']}")
-        env = lab.Lab(args.level_script, ['RGB_INTERLEAVED'], config=task_config) 
 
+        environments = [
+            lab.Lab(args.level_script, ['RGB_INTERLEAVED'], config=task_config) 
+            for _ in range(config["agent"]["n-workers"])
+        ]
+
+        shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
+        shared_model.share_memory()
+
+        if config["agent"]["share-optim"]:
+            optimizer = shared_optim.SharedAdam(shared_model.parameters(), lr=config["agent"]["lr"])
+            optimizer.share_memory()
+        else:
+            optimizer = None 
+   
+        processes = []
+        counter = mp.Value('i', 0)
+        lock = mp.Lock()
+
+        workers = []
+        for rank in range(config["agent"]["n-workers"]):
+            workers += [
+                Trainer(config, 
+                environments[rank], 
+                shared_model,
+                optimizer,
+                counter,
+                lock,
+                rank+1
+            )]
+
+        
         T.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         T.random.manual_seed(config["seed"])
 
-        trainer = Trainer(config, env)
-        trainer.train(config["task"]["train-episodes"])
+        if config["resume"]:
+            filepath = os.path.join(
+                config["save-path"], 
+                config["run-title"], 
+                f"{config['run-title']}_{config['start-episode']}.pt"
+            )
+            shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
+        for worker in workers:
+            train = lambda: worker.train(config["task"]["train-episodes"])
+            p = mp.Process(target=train)
+            p.start()
+            processes += [p]
 
-
-        
+        for p in processes:
+            p.join()
 
 
 

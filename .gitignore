@@ -1,5 +1,6 @@
 logs
 ckpt
+samples
 
 *.pyc
 *.txt
