@@ -12,15 +12,17 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm 
 from collections import namedtuple
 
-import deepmind_lab as lab 
+# import deepmind_lab as lab 
 
 import shared_optim
-from train import Trainer
+from train import train, train_stacked
 from harlow import HarlowWrapper
-from models.a3c_lstm import A3C_LSTM
+from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 
    
 if __name__ == "__main__":
+
+    mp.set_start_method("spawn")
     os.environ['OMP_NUM_THREADS'] = '1'
 
     parser = argparse.ArgumentParser(description='Paramaters')
@@ -69,7 +71,6 @@ if __name__ == "__main__":
     if args.video:
         task_config['video'] = args.video
 
-
     n_seeds = 1
     base_seed = config["seed"]
     base_run_title = config["run-title"]
@@ -85,19 +86,50 @@ if __name__ == "__main__":
         with open(out_path, 'w') as fout:
             yaml.dump(config, fout)
 
+        ############## Start Here ##############
         print(f"> Running {config['run-title']}")
-        env = lab.Lab(args.level_script, ['RGB_INTERLEAVED'], config=task_config) 
 
+        if config["mode"] == "stacked":
+            shared_model = A3C_StackedLSTM(config["agent"], config["task"]["num-actions"])
+        else:
+            shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
+        shared_model.share_memory()
+
+        optimizer = shared_optim.SharedAdam(shared_model.parameters(), lr=config["agent"]["lr"])
+        optimizer.share_memory()
+   
+        processes = []
+        counter = mp.Value('i', 0)
+        lock = mp.Lock()
+        
         T.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         T.random.manual_seed(config["seed"])
 
-        trainer = Trainer(config, env)
-        trainer.train(config["task"]["train-episodes"])
+        if config["resume"]:
+            filepath = os.path.join(
+                config["save-path"], 
+                config["run-title"], 
+                f"{config['run-title']}_{config['start-episode']}.pt"
+            )
+            shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
+        train_target = train_stacked if config["mode"] == "stacked" else train
+        for rank in range(config["agent"]["n-workers"]):
+            p = mp.Process(target=train_target, args=(
+                config,
+                shared_model,
+                optimizer,
+                rank,
+                lock,
+                counter,
+                task_config
+            ))
+            p.start()
+            processes += [p]
 
-
-        
+        for p in processes:
+            p.join()
 
 
 

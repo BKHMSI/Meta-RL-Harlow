@@ -1,19 +1,18 @@
-run-title: Harlow_2
-seed: 1111
+run-title: Harlow_7
+seed: 1995
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
 log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs
-save-interval: 500
-print-interval: 100
+save-interval: 250
 resume: false
 start-episode: 0
 train: true
 test: true
-mode: episodic # {incremental, episodic}
+mode: stacked # {vanilla, stacked}
 
 task:
   imsize: 34
   max-length: 3600
-  num-trials: 6 # 3600 steps
+  num-trials: 6
 
   num-actions: 3
   action-repeat: 4
@@ -27,16 +26,17 @@ agent:
   dict-len: 100_000
   dict-kernel: cosine
 
-  n-workers: 1
+  n-workers: 32
   share-optim: true
   
   value-loss-weight: 0.4
   entropy-weight: 0.001
   max-grad-norm: 0.
   
+  gae-lambda: 1.
   gamma: .91
   lr: 7.5e-4
   weight-decay: 0
 
-  lstm-unroll: 100
+  n-step-update: 100 # lstm-unroll
 

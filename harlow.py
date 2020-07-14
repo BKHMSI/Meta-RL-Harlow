@@ -1,5 +1,6 @@
-import numpy as np 
+import os
 import imageio
+import numpy as np 
 
 PIXELS_PER_ACTION = 1
 
@@ -11,14 +12,18 @@ class HarlowWrapper:
   Args:
       env (deepmind_lab.Lab): DeepMind Lab environment.
   """
-  def __init__(self, env, config, save_interval=100):
+  def __init__(self, env, config, rank):
     self.env = env
-    self.max_length = config["max-length"]
-    self.num_trials = config["num-trials"]
-    self.num_actions = 3 # {no-op, left, right}
-    self.save_interval = save_interval
+    self.max_length = config["task"]["max-length"]
+    self.num_trials = config["task"]["num-trials"]
+    self.save_interval = config["save-interval"]
+    self.save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}.gif")
+    self.rank = rank 
     self.frames = []
+    self.num_actions = 3 # {no-op, left, right}
+    self.episode_num = 0
     self.trial_num = 0
+    self.episode_num = 0
     self.reset()
 
   def step(self, action, repeat=4):
@@ -35,8 +40,11 @@ class HarlowWrapper:
     reward = self.env.step(action_vec, num_steps=repeat)
     self.frames += [obs['RGB_INTERLEAVED']]
 
+    if reward in [-5, 5]:
+      self.trial_num += 1
+
     timestep = self.num_steps() 
-    done = not self.env.is_running() or timestep > self.max_length or reward in [-5, 5]
+    done = not self.env.is_running() or timestep > self.max_length or self.trial_num >= self.num_trials
 
     return self._preprocess(obs['RGB_INTERLEAVED']), reward, done, timestep
 
@@ -44,11 +52,14 @@ class HarlowWrapper:
     self.env.reset()
     obs = self.env.observations()
 
-    if len(self.frames) > 0 and ((self.trial_num+1) % self.save_interval) == 0:
-      self.trial_num += 1
-      filepath = f"/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/samples/sample_{self.trial_num}.gif"
+    if len(self.frames) > 0:
+        self.episode_num += 1
+
+    if self.episode_num > 0 and self.rank == 0 and (self.episode_num % self.save_interval) == 0:
+      filepath = self.save_path.format(epi=self.episode_num)
       imageio.mimsave(filepath, self.frames)
 
+    self.trial_num = 0
     self.frames = []
     return self._preprocess(obs['RGB_INTERLEAVED'])
 

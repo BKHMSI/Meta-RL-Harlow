@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 import torch as T
 import torch.nn as nn
+from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm 
@@ -14,164 +15,301 @@ from collections import namedtuple
 import deepmind_lab as lab 
 
 from harlow import HarlowWrapper
-from models.a3c_lstm import A3C_LSTM
-# from models.a3c_dnd_lstm import A3C_DND_LSTM
+from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 
-Rollout = namedtuple('Rollout',
-                        ('state', 'action', 'reward', 'timestep', 'done', 'policy', 'value'))
-
-class Trainer: 
-    def __init__(self, config, env):
-        self.device = 'cpu'
-        self.mode = config["mode"]
-        self.seed = config["seed"]
-
-        self.env = HarlowWrapper(env, config["task"], config["save-interval"])
-        self.agent = A3C_LSTM(config["agent"], self.env.num_actions)
-
-        self.optim = T.optim.RMSprop(self.agent.parameters(), lr=config["agent"]["lr"])
-       
-        self.gamma = config["agent"]["gamma"]
-        self.val_coeff = config["agent"]["value-loss-weight"]
-        self.entropy_coeff = config["agent"]["entropy-weight"]
-        self.max_grad_norm = config["agent"]["max-grad-norm"]
-        self.start_episode = 0
-
-        self.writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"]))
-        self.save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
-        self.save_interval = config["save-interval"]
-
-        self.finished_trials = 0
-
-
-    def run_episode(self, episode):
-        total_reward = 0
-        mem_state = self.agent.get_init_states()
-
-        buffer = []
-        state = self.env.reset()
-        for trial in range(self.env.num_trials):
-            done = False
-            p_action, p_reward = [0,0,0], 0
-            while not done:
-
-                action_dist, val_estimate, mem_state = self.agent(
-                    T.tensor(state), 
-                    (T.tensor(p_action).unsqueeze(0).float(), 
-                    T.tensor([p_reward]).unsqueeze(0).float()), 
-                    mem_state
-                )
-
-                action_cat = T.distributions.Categorical(action_dist.squeeze())
-                action = action_cat.sample()
-                action_onehot = np.eye(self.env.num_actions)[action]
-
-                new_state, reward, done, timestep = self.env.step(int(action))
-
-                if done and self.env.num_steps() < self.env.max_length:
-                    self.finished_trials += 1
-
-                # ('state', 'action', 'reward', 'timestep', 'done', 'policy', 'value')
-                buffer += [Rollout(
-                    state, 
-                    action_onehot,
-                    reward,
-                    timestep,
-                    done,
-                    action_dist,
-                    val_estimate
-                )]
-
-                state = new_state
-                p_reward = reward
-                p_action = action_onehot
-
-                total_reward += reward
-
-        # boostrap final observation 
-        _, val_estimate, _ = self.agent(
-            T.tensor(state), 
-            (T.tensor(p_action).unsqueeze(0).float(), 
-            T.tensor([p_reward]).unsqueeze(0).float()), 
-            mem_state
-        )
-        buffer += [Rollout(*[None]*6, val_estimate)]
-
-        return total_reward, buffer
-
-    def a3c_loss(self, buffer, gamma, lambd=1.0):
-        # bootstrap discounted returns with final value estimates
-        _, _, _, _, _, _, last_value = buffer[-1]
-        returns = last_value.data
-        advantages = 0
-
-        all_returns = T.zeros(len(buffer)-1, device=self.device)
-        all_advantages = T.zeros(len(buffer)-1, device=self.device)
-        # run Generalized Advantage Estimation, calculate returns, advantages
-        for t in reversed(range(len(buffer) - 1)):
-            # ('state', 'action', 'reward', 'timestep', 'done', 'policy', 'value')
-            _, _, reward, _, done, _, value = buffer[t]
-
-            _, _, _, _, _, _, next_value = buffer[t+1]
-
-            mask = ~done
-
-            returns = reward + returns * gamma * mask
-
-            deltas = reward + next_value.data * gamma * mask - value.data
-            advantages = advantages * gamma * lambd * mask + deltas
-
-            all_returns[t] = returns 
-            all_advantages[t] = advantages
-
-        batch = Rollout(*zip(*buffer))
-
-        policy = T.cat(batch.policy[:-1], dim=0).squeeze().to(self.device)
-        action = T.tensor(batch.action[:-1], device=self.device)
-        values = T.tensor(batch.value[:-1], device=self.device)
+def ensure_shared_grads(model, shared_model):
+    for param, shared_param in zip(model.parameters(), 
+                                shared_model.parameters()):
+        if shared_param.grad is not None:
+            return
+        shared_param._grad = param.grad
         
-        logits = (policy * action).sum(1)
-        policy_loss = -(T.log(logits) * all_advantages).mean()
-        value_loss = 0.5 * (all_returns - values).pow(2).mean()
-        entropy_reg = -(policy * T.log(policy)).mean()
 
-        loss = self.val_coeff * value_loss + policy_loss - self.entropy_coeff * entropy_reg
+def train(config, 
+    shared_model, 
+    optimizer, 
+    rank, 
+    lock, 
+    counter,
+    task_config
+):
 
-        return loss 
+    T.manual_seed(config["seed"] + rank)
+    np.random.seed(config["seed"] + rank)
+    T.random.manual_seed(config["seed"] + rank)
 
+    lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
+    env = HarlowWrapper(lab_env, config, rank)
+    agent = A3C_LSTM(config['agent'], env.num_actions)
+    agent.train()
 
-    def train(self, max_episodes):
+    ### hyper-parameters ###
+    gamma = config["agent"]["gamma"]
+    gae_lambda = config["agent"]["gae-lambda"]
+    val_coeff = config["agent"]["value-loss-weight"]
+    entropy_coeff = config["agent"]["entropy-weight"]
+    n_step_update = config["agent"]["n-step-update"]
+    device = "cpu"
 
-        total_rewards = np.zeros(max_episodes)
+    if rank % 4 == 0:
+        writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
+    save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
+    save_interval = config["save-interval"]
 
-        self.agent.train()
-        progress = tqdm(range(self.start_episode, max_episodes))
-        for episode in progress:
+    done = True 
+    state = env.reset()
+    p_action, p_reward = [0,0,0], 0
 
-            reward, buffer = self.run_episode(episode)
-        
-            self.optim.zero_grad()
-            loss = self.a3c_loss(buffer, self.gamma) 
-            loss.backward()
-            if self.max_grad_norm > 0:
-                grad_norm = nn.utils.clip_grad_norm_(self.agent.parameters(), self.max_grad_norm)
-            self.optim.step()
-            total_rewards[episode] = reward
+    print('='*50)
+    print(f"Starting Trainer {rank}")
+    print('='*50)
 
-            avg_reward_10 = total_rewards[max(0, episode-10):(episode+1)].mean()
-            avg_reward_100 = total_rewards[max(0, episode-100):(episode+1)].mean()
-            self.writer.add_scalar("perf/reward_t", reward, episode)
-            self.writer.add_scalar("perf/avg_reward_10", avg_reward_10, episode)
-            self.writer.add_scalar("perf/avg_reward_100", avg_reward_100, episode)
-            self.writer.add_scalar("losses/total_loss", loss.item(), episode)
-            if self.max_grad_norm > 0:
-                self.writer.add_scalar("losses/grad_norm", grad_norm, episode)
+    episode_reward = 0
+    update_counter = 0
+    total_rewards = []
+
+    while True:
+
+        agent.load_state_dict(shared_model.state_dict())
+        if done:
+            ht, ct = agent.get_init_states(device)
+        else:
+            ht, ct = ht.detach(), ct.detach()
+
+        values = []
+        log_probs = []
+        rewards = []
+        entropies = []
+
+        for _ in range(n_step_update):
+
+            logit, value, (ht, ct) = agent(
+                T.tensor(state).to(device), (
+                T.tensor(p_action).unsqueeze(0).float().to(device), 
+                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                (ht, ct)
+            )
+
+            logit = logit.squeeze(0)
+
+            prob = F.softmax(logit, dim=-1)
+            log_prob = F.log_softmax(logit, dim=-1)
+            entropy = -(log_prob * prob).sum(1, keepdim=True)
+            entropies += [entropy]
+            action = prob.multinomial(num_samples=1).detach()
+
+            log_prob = log_prob.gather(1, action)
+
+            state, reward, done, _ = env.step(int(action))
+
+            episode_reward += reward
+
+            p_action = np.eye(env.num_actions)[int(action)]
+            p_reward = reward
             
-            progress.set_description(f"Episode {episode}/{max_episodes} | Reward: {reward} | Last 10: {avg_reward_10:.4f} | Loss: {loss.item():.4f} | Finished Trials: {self.finished_trials}")
+            log_probs += [log_prob]
+            values += [value]
+            rewards += [reward]
+
+            if done:
+                state = env.reset()
+                total_rewards += [episode_reward]
+                
+                if rank % 4 == 0:
+                    avg_reward_100 = np.array(total_rewards[max(0, env.episode_num-100):(env.episode_num+1)]).mean()
+                    writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
+                    writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
+
+                episode_reward = 0
+                if env.episode_num % save_interval == 0 and rank == 0:
+                    T.save({
+                        "state_dict": shared_model.state_dict(),
+                        "avg_reward_100": avg_reward_100,
+                    }, save_path.format(epi=env.episode_num) + ".pt")
+
+                break 
+
+        R = T.zeros(1, 1)
+        if not done:
+            _, value, _ = agent(
+                T.tensor(state).to(device), (
+                T.tensor(p_action).unsqueeze(0).float().to(device), 
+                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                (ht, ct)
+            )
+            R = value.detach()
         
-            if (episode+1) % self.save_interval == 0:
-                T.save({
-                    "state_dict": self.agent.state_dict(),
-                    "avg_reward_100": avg_reward_100,
-                    'last_episode': episode,
-                }, self.save_path.format(epi=episode+1) + ".pt")
+        values += [R]
+
+        policy_loss = 0
+        value_loss = 0
+        gae = T.zeros(1, 1)
+
+        for i in reversed(range(len(rewards))):
+            R = gamma * R + rewards[i]
+            advantage = R - values[i]
+            value_loss = value_loss + 0.5 * advantage.pow(2)
+            
+            # Generalized Advantage Estimation
+            delta_t = rewards[i] + gamma * values[i + 1] - values[i]
+            gae = gae * gamma * gae_lambda + delta_t
+
+            policy_loss = policy_loss - \
+                log_probs[i] * gae.detach() - entropy_coeff * entropies[i]
+
+        loss = policy_loss + val_coeff * value_loss
+        optimizer.zero_grad()
+        loss.backward()
+        ensure_shared_grads(agent, shared_model)
+        optimizer.step()
+
+        update_counter += 1
+
+        if rank % 4 == 0:
+            writer.add_scalar("losses/total_loss", loss.item(), update_counter)
+
+
+def train_stacked(config, 
+    shared_model, 
+    optimizer, 
+    rank, 
+    lock, 
+    counter,
+    task_config
+):
+
+    T.manual_seed(config["seed"] + rank)
+    np.random.seed(config["seed"] + rank)
+    T.random.manual_seed(config["seed"] + rank)
+
+    lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
+    env = HarlowWrapper(lab_env, config, rank)
+    agent = A3C_StackedLSTM(config['agent'], env.num_actions)
+    agent.train()
+
+    ### hyper-parameters ###
+    gamma = config["agent"]["gamma"]
+    gae_lambda = config["agent"]["gae-lambda"]
+    val_coeff = config["agent"]["value-loss-weight"]
+    entropy_coeff = config["agent"]["entropy-weight"]
+    n_step_update = config["agent"]["n-step-update"]
+    device = "cpu"
+
+    if rank % 4 == 0:
+        writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
+    save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
+    save_interval = config["save-interval"]
+
+    done = True 
+    state = env.reset()
+    p_action, p_reward = [0,0,0], 0
+
+    print('='*50)
+    print(f"Starting Trainer {rank}")
+    print('='*50)
+
+    episode_reward = 0
+    update_counter = 0
+    total_rewards = []
+
+    while True:
+
+        agent.load_state_dict(shared_model.state_dict())
+        if done:
+            ht1, ct1 = agent.get_init_states(1, device)
+            ht2, ct2 = agent.get_init_states(2, device)
+        else:
+            ht1, ct1 = ht1.detach(), ct1.detach()
+            ht2, ct2 = ht2.detach(), ct2.detach()
+
+        values = []
+        log_probs = []
+        rewards = []
+        entropies = []
+
+        for _ in range(n_step_update):
+
+            logit, value, (ht1, ct1), (ht2, ct2) = agent(
+                T.tensor(state).to(device), (
+                T.tensor(p_action).unsqueeze(0).float().to(device), 
+                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                (ht1, ct1), (ht2, ct2)
+            )
+
+            logit = logit.squeeze(0)
+
+            prob = F.softmax(logit, dim=-1)
+            log_prob = F.log_softmax(logit, dim=-1)
+            entropy = -(log_prob * prob).sum(1, keepdim=True)
+            entropies += [entropy]
+            action = prob.multinomial(num_samples=1).detach()
+
+            log_prob = log_prob.gather(1, action)
+
+            state, reward, done, _ = env.step(int(action))
+
+            episode_reward += reward
+
+            p_action = np.eye(env.num_actions)[int(action)]
+            p_reward = reward
+            
+            log_probs += [log_prob]
+            values += [value]
+            rewards += [reward]
+
+            if done:
+                state = env.reset()
+                total_rewards += [episode_reward]
+                
+                if rank % 4 == 0:
+                    avg_reward_100 = np.array(total_rewards[max(0, env.episode_num-100):(env.episode_num+1)]).mean()
+                    writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
+                    writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
+
+                episode_reward = 0
+                if env.episode_num % save_interval == 0 and rank == 0:
+                    T.save({
+                        "state_dict": shared_model.state_dict(),
+                        "avg_reward_100": avg_reward_100,
+                    }, save_path.format(epi=env.episode_num) + ".pt")
+
+                break 
+
+        R = T.zeros(1, 1)
+        if not done:
+            _, value, _, _ = agent(
+                T.tensor(state).to(device), (
+                T.tensor(p_action).unsqueeze(0).float().to(device), 
+                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                (ht1, ct1), (ht2, ct2)
+            )
+            R = value.detach()
+        
+        values += [R]
+
+        policy_loss = 0
+        value_loss = 0
+        gae = T.zeros(1, 1)
+
+        for i in reversed(range(len(rewards))):
+            R = gamma * R + rewards[i]
+            advantage = R - values[i]
+            value_loss = value_loss + 0.5 * advantage.pow(2)
+            
+            # Generalized Advantage Estimation
+            delta_t = rewards[i] + gamma * values[i + 1] - values[i]
+            gae = gae * gamma * gae_lambda + delta_t
+
+            policy_loss = policy_loss - \
+                log_probs[i] * gae.detach() - entropy_coeff * entropies[i]
+
+        loss = policy_loss + val_coeff * value_loss
+        optimizer.zero_grad()
+        loss.backward()
+        ensure_shared_grads(agent, shared_model)
+        optimizer.step()
+
+        update_counter += 1
+
+        if rank % 4 == 0:
+            writer.add_scalar("losses/total_loss", loss.item(), update_counter)
