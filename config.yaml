@@ -1,10 +1,12 @@
-run-title: Harlow_7
+run-title: Harlow_9
+load-title: Harlow_9_1
 seed: 1995
+device: cpu
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
 log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs
-save-interval: 250
-resume: false
-start-episode: 0
+save-interval: 50
+resume: true
+start-episode: 550
 train: true
 test: true
 mode: stacked # {vanilla, stacked}

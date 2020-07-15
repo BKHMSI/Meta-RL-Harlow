@@ -37,10 +37,12 @@ def train(config,
     T.manual_seed(config["seed"] + rank)
     np.random.seed(config["seed"] + rank)
     T.random.manual_seed(config["seed"] + rank)
+    device = config["device"]
 
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
     agent = A3C_LSTM(config['agent'], env.num_actions)
+    agent.to(device)
     agent.train()
 
     ### hyper-parameters ###
@@ -49,7 +51,6 @@ def train(config,
     val_coeff = config["agent"]["value-loss-weight"]
     entropy_coeff = config["agent"]["entropy-weight"]
     n_step_update = config["agent"]["n-step-update"]
-    device = "cpu"
 
     if rank % 4 == 0:
         writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
@@ -67,6 +68,7 @@ def train(config,
     episode_reward = 0
     update_counter = 0
     total_rewards = []
+    reward_counter = 0
 
     while True:
 
@@ -116,10 +118,11 @@ def train(config,
                 total_rewards += [episode_reward]
                 
                 if rank % 4 == 0:
-                    avg_reward_100 = np.array(total_rewards[max(0, env.episode_num-100):(env.episode_num+1)]).mean()
+                    avg_reward_100 = np.array(total_rewards[max(0, reward_counter-100):(reward_counter+1)]).mean()
                     writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
                     writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
 
+                reward_counter += 1
                 episode_reward = 0
                 if env.episode_num % save_interval == 0 and rank == 0:
                     T.save({
@@ -129,7 +132,7 @@ def train(config,
 
                 break 
 
-        R = T.zeros(1, 1)
+        R = T.zeros(1, 1).to(device)
         if not done:
             _, value, _ = agent(
                 T.tensor(state).to(device), (
@@ -143,7 +146,7 @@ def train(config,
 
         policy_loss = 0
         value_loss = 0
-        gae = T.zeros(1, 1)
+        gae = T.zeros(1, 1).to(device)
 
         for i in reversed(range(len(rewards))):
             R = gamma * R + rewards[i]
@@ -181,10 +184,11 @@ def train_stacked(config,
     T.manual_seed(config["seed"] + rank)
     np.random.seed(config["seed"] + rank)
     T.random.manual_seed(config["seed"] + rank)
+    device = config["device"]
 
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
-    agent = A3C_StackedLSTM(config['agent'], env.num_actions)
+    agent = A3C_StackedLSTM(config['agent'], env.num_actions).to(device)
     agent.train()
 
     ### hyper-parameters ###
@@ -193,7 +197,6 @@ def train_stacked(config,
     val_coeff = config["agent"]["value-loss-weight"]
     entropy_coeff = config["agent"]["entropy-weight"]
     n_step_update = config["agent"]["n-step-update"]
-    device = "cpu"
 
     if rank % 4 == 0:
         writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
@@ -262,10 +265,10 @@ def train_stacked(config,
                 total_rewards += [episode_reward]
                 
                 if rank % 4 == 0:
-                    avg_reward_100 = np.array(total_rewards[max(0, env.episode_num-100):(env.episode_num+1)]).mean()
+                    avg_reward_100 = np.array(total_rewards[-100:]).mean()
                     writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
                     writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
-
+    
                 episode_reward = 0
                 if env.episode_num % save_interval == 0 and rank == 0:
                     T.save({
@@ -275,7 +278,7 @@ def train_stacked(config,
 
                 break 
 
-        R = T.zeros(1, 1)
+        R = T.zeros(1, 1).to(device)
         if not done:
             _, value, _, _ = agent(
                 T.tensor(state).to(device), (
@@ -289,7 +292,7 @@ def train_stacked(config,
 
         policy_loss = 0
         value_loss = 0
-        gae = T.zeros(1, 1)
+        gae = T.zeros(1, 1).to(device)
 
         for i in reversed(range(len(rewards))):
             R = gamma * R + rewards[i]

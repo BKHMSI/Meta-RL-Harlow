@@ -95,6 +95,8 @@ if __name__ == "__main__":
             shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
         shared_model.share_memory()
 
+        shared_model.to(config['device'])
+
         optimizer = shared_optim.SharedAdam(shared_model.parameters(), lr=config["agent"]["lr"])
         optimizer.share_memory()
    
@@ -109,9 +111,10 @@ if __name__ == "__main__":
         if config["resume"]:
             filepath = os.path.join(
                 config["save-path"], 
-                config["run-title"], 
-                f"{config['run-title']}_{config['start-episode']}.pt"
+                config["load-title"], 
+                f"{config['load-title']}_0{config['start-episode']}.pt"
             )
+            print(f"> Loading Checkpoint {filepath}")
             shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
         train_target = train_stacked if config["mode"] == "stacked" else train

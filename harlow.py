@@ -21,9 +21,8 @@ class HarlowWrapper:
     self.rank = rank 
     self.frames = []
     self.num_actions = 3 # {no-op, left, right}
-    self.episode_num = 0
+    self.episode_num = config["start-episode"]
     self.trial_num = 0
-    self.episode_num = 0
     self.reset()
 
   def step(self, action, repeat=4):
@@ -55,7 +54,7 @@ class HarlowWrapper:
     if len(self.frames) > 0:
         self.episode_num += 1
 
-    if self.episode_num > 0 and self.rank == 0 and (self.episode_num % self.save_interval) == 0:
+    if self.episode_num > 0 and len(self.frames) > 0 and self.rank == 0 and (self.episode_num % self.save_interval) == 0:
       filepath = self.save_path.format(epi=self.episode_num)
       imageio.mimsave(filepath, self.frames)
 
