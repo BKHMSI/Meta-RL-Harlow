@@ -67,7 +67,8 @@ class HarlowWrapper:
 
   def _preprocess(self, obs):
     obs = obs.astype(np.float32)
-    obs *= (1.0 / 255.0)
+    obs = obs / 255.0
+    obs = (obs - 0.5) / 0.5
     return np.einsum('ijk->kij', obs)
 
   def _create_action(self, action):

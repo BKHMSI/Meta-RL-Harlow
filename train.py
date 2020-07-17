@@ -2,20 +2,22 @@ import os
 import yaml
 import pickle
 import argparse
-
 import numpy as np
+
 import torch as T
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm 
+from datetime import datetime 
 from collections import namedtuple
 
 import deepmind_lab as lab 
 
 from harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
+from models.a3c_conv_lstm import A3C_ConvLSTM
 
 def ensure_shared_grads(model, shared_model):
     for param, shared_param in zip(model.parameters(), 
@@ -41,7 +43,11 @@ def train(config,
 
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
-    agent = A3C_LSTM(config['agent'], env.num_actions)
+    if config["mode"] == "vanilla":
+        agent = A3C_LSTM(config["agent"], env.num_actions)
+    else:
+        raise ValueError(config["mode"])
+
     agent.to(device)
     agent.train()
 
@@ -83,6 +89,7 @@ def train(config,
         rewards = []
         entropies = []
 
+        start_time = datetime.now()
         for _ in range(n_step_update):
 
             logit, value, (ht, ct) = agent(
@@ -168,6 +175,7 @@ def train(config,
 
         update_counter += 1
 
+        print(f"Elapsed Time: {datetime.now() - start_time}")
         if rank % 4 == 0:
             writer.add_scalar("losses/total_loss", loss.item(), update_counter)
 
@@ -188,7 +196,15 @@ def train_stacked(config,
 
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
-    agent = A3C_StackedLSTM(config['agent'], env.num_actions).to(device)
+    
+    if config["mode"] == "conv-stacked":
+        agent = A3C_ConvLSTM(config["agent"], env.num_actions)
+    elif config["mode"] == "stacked":
+        agent = A3C_StackedLSTM(config["agent"], env.num_actions)
+    else:
+        raise ValueError(config["mode"])    
+    
+    agent.to(device)
     agent.train()
 
     ### hyper-parameters ###
@@ -198,8 +214,8 @@ def train_stacked(config,
     entropy_coeff = config["agent"]["entropy-weight"]
     n_step_update = config["agent"]["n-step-update"]
 
-    if rank % 4 == 0:
-        writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
+    # if rank % 4 == 0:
+    writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
     save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
     save_interval = config["save-interval"]
 
@@ -264,10 +280,10 @@ def train_stacked(config,
                 state = env.reset()
                 total_rewards += [episode_reward]
                 
-                if rank % 4 == 0:
-                    avg_reward_100 = np.array(total_rewards[-100:]).mean()
-                    writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
-                    writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
+                # if rank % 4 == 0:
+                avg_reward_100 = np.array(total_rewards[-100:]).mean()
+                writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
+                writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
     
                 episode_reward = 0
                 if env.episode_num % save_interval == 0 and rank == 0:
@@ -313,6 +329,5 @@ def train_stacked(config,
         optimizer.step()
 
         update_counter += 1
-
-        if rank % 4 == 0:
-            writer.add_scalar("losses/total_loss", loss.item(), update_counter)
+        # if rank % 4 == 0:
+        writer.add_scalar("losses/total_loss", loss.item(), update_counter)

@@ -58,7 +58,8 @@ class SharedAdam(optim.Adam):
 
                 # Decay the first and second moment running average coefficient
                 exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                # exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
                 denom = exp_avg_sq.sqrt().add_(group['eps'])
 
@@ -118,9 +119,11 @@ class SharedRMSprop(optim.RMSprop):
                     grad = grad.add(group['weight_decay'], p.data)
 
                 # g = αg + (1 - α)Δθ^2
-                square_avg.mul_(alpha).addcmul_(1 - alpha, grad, grad)
+                # square_avg.mul_(alpha).addcmul_(1 - alpha, grad, grad)
+                square_avg.mul_(alpha).addcmul_(grad, grad, value=1 - alpha)
                 # θ ← θ - ηΔθ/√(g + ε)
                 avg = square_avg.sqrt().add_(group['eps'])
-                p.data.addcdiv_(-group['lr'], grad, avg)
+                # p.data.addcdiv_(-group['lr'], grad, avg)
+                p.data.addcdiv_(grad, avg, value=-group['lr'])
 
         return loss

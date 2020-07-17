@@ -14,10 +14,11 @@ from collections import namedtuple
 
 # import deepmind_lab as lab 
 
-import shared_optim
+from shared_optim import SharedAdam, SharedRMSprop
 from train import train, train_stacked
 from harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
+from models.a3c_conv_lstm import A3C_ConvLSTM
 
    
 if __name__ == "__main__":
@@ -87,17 +88,22 @@ if __name__ == "__main__":
             yaml.dump(config, fout)
 
         ############## Start Here ##############
-        print(f"> Running {config['run-title']}")
+        print(f"> Running {config['run-title']} {config['mode']} using {config['optimizer']}")
 
-        if config["mode"] == "stacked":
+        if config["mode"] == "conv-stacked":
+            shared_model = A3C_ConvLSTM(config["agent"], config["task"]["num-actions"])
+        elif config["mode"] == "stacked":
             shared_model = A3C_StackedLSTM(config["agent"], config["task"]["num-actions"])
-        else:
+        elif config["mode"] == "vanilla":
             shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
-        shared_model.share_memory()
+        else:
+            raise ValueError(config["mode"])
 
+        shared_model.share_memory()
         shared_model.to(config['device'])
 
-        optimizer = shared_optim.SharedAdam(shared_model.parameters(), lr=config["agent"]["lr"])
+        optim_class = SharedAdam if config["optimizer"] == "adam" else SharedRMSprop
+        optimizer = optim_class(shared_model.parameters(), lr=config["agent"]["lr"])
         optimizer.share_memory()
    
         processes = []
@@ -112,12 +118,12 @@ if __name__ == "__main__":
             filepath = os.path.join(
                 config["save-path"], 
                 config["load-title"], 
-                f"{config['load-title']}_0{config['start-episode']}.pt"
+                f"{config['load-title']}_{config['start-episode']}.pt"
             )
             print(f"> Loading Checkpoint {filepath}")
             shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
-        train_target = train_stacked if config["mode"] == "stacked" else train
+        train_target = train_stacked if "stacked" in config["mode"] else train
         for rank in range(config["agent"]["n-workers"]):
             p = mp.Process(target=train_target, args=(
                 config,

@@ -3,5 +3,9 @@ ckpt
 samples
 archive
 
+pretrain/logs
+pretrain/data
+pretrain/models
+
 *.pyc
 *.txt

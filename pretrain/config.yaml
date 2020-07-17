@@ -1,0 +1,33 @@
+run-title: cifar10-1
+device: cuda:0
+seed: 1111
+train: true 
+test: true
+load-path: ./models/cifar10-1/cifar10-1.pt
+resume: false
+
+# dataset 
+data-path: ./data
+batch-size: 128
+val-batch-size: 1024
+valid-size: 0.1
+shuffle: true 
+augment: true
+num-workers: 0
+pin-memory: true 
+num-classes: 10
+
+# training
+epochs: 1000
+save-path: ./models
+
+weight-decay: 0
+lr-init: 1.e-3
+lr-factor: 0.5
+lr-patience: 2
+lr-min: 1.e-7
+
+stopping-delta: 1.e-7
+stopping-patience: 12
+
+
