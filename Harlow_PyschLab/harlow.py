@@ -28,9 +28,10 @@ class HarlowWrapper:
   def step(self, action, repeat=4):
     '''
       Rewards: 
-        fixation       1
-        correct image  5
-        wrong image   -5
+        fixation      1.00
+        correct image 5.00
+        wrong image  -5.00
+        Time Penalty -0.01
     '''
     
     action_vec = self._create_action(action)
@@ -41,6 +42,11 @@ class HarlowWrapper:
 
     if reward in [-5, 5]:
       self.trial_num += 1
+
+    if reward == 0:
+      reward = -0.01
+    
+    # reward = reward / 5. 
 
     timestep = self.num_steps() 
     done = not self.env.is_running() or timestep > self.max_length or self.trial_num >= self.num_trials

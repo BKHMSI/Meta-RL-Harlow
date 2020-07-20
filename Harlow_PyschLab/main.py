@@ -12,9 +12,12 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm 
 from collections import namedtuple
 
-from common.shared_optim import SharedAdam, SharedRMSprop
-from Harlow_Simple.train import train, train_stacked
-from models.a3c_lstm_simple import A3C_LSTM
+# import deepmind_lab as lab 
+
+from shared_optim import SharedAdam, SharedRMSprop
+from train import train, train_stacked
+from harlow import HarlowWrapper
+from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 from models.a3c_conv_lstm import A3C_ConvLSTM
 
    
@@ -24,11 +27,50 @@ if __name__ == "__main__":
     os.environ['OMP_NUM_THREADS'] = '1'
 
     parser = argparse.ArgumentParser(description='Paramaters')
-    parser.add_argument('-c', '--config',  type=str, default="Harlow_Simple/config.yaml", help='path of config file')
+    parser.add_argument('-c', '--config',  type=str, 
+                        default="/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/config.yaml", 
+                        help='path of config file')
+    parser.add_argument('--length', type=int, default=3600,
+                        help='Number of steps to run the agent')
+    parser.add_argument('--width', type=int, default=84,
+                        help='Horizontal size of the observations')
+    parser.add_argument('--height', type=int, default=84,
+                        help='Vertical size of the observations')
+    parser.add_argument('--fps', type=int, default=60,
+                        help='Number of frames per second')
+    parser.add_argument('--runfiles_path', type=str, default=None,
+                        help='Set the runfiles path to find DeepMind Lab data')
+    parser.add_argument('--level_script', type=str,
+                        default='contributed/psychlab/harlow',
+                        help='The environment level script to load')
+    parser.add_argument('--record', type=str, default=None,
+                        help='Record the run to a demo file')
+    parser.add_argument('--demo', type=str, default=None,
+                        help='Play back a recorded demo file')
+    parser.add_argument('--demofiles', type=str, default=None,
+                        help='Directory for demo files')
+    parser.add_argument('--video', type=str, default=None,
+                        help='Record the demo run as a video')
+
     args = parser.parse_args()
 
     with open(args.config, 'r', encoding="utf-8") as fin:
         config = yaml.load(fin, Loader=yaml.FullLoader)
+
+    task_config = {
+        'fps': str(args.fps),
+        'width': str(args.width),
+        'height': str(args.height)
+    }
+
+    if args.record:
+        task_config['record'] = args.record
+    if args.demo:
+        task_config['demo'] = args.demo
+    if args.demofiles:
+        task_config['demofiles'] = args.demofiles
+    if args.video:
+        task_config['video'] = args.video
 
     n_seeds = 1
     base_seed = config["seed"]
@@ -48,7 +90,11 @@ if __name__ == "__main__":
         ############## Start Here ##############
         print(f"> Running {config['run-title']} {config['mode']} using {config['optimizer']}")
 
-        if config["mode"] == "vanilla":
+        if config["mode"] == "conv-stacked":
+            shared_model = A3C_ConvLSTM(config["agent"], config["task"]["num-actions"])
+        elif config["mode"] == "stacked":
+            shared_model = A3C_StackedLSTM(config["agent"], config["task"]["num-actions"])
+        elif config["mode"] == "vanilla":
             shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
         else:
             raise ValueError(config["mode"])
@@ -86,6 +132,7 @@ if __name__ == "__main__":
                 rank,
                 lock,
                 counter,
+                task_config
             ))
             p.start()
             processes += [p]

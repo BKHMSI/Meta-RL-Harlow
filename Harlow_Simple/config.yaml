@@ -1,0 +1,42 @@
+run-title: HarlowSimple_1
+load-title: Harlow_15_1
+seed: 1
+device: cpu
+save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs
+save-interval: 100
+resume: false
+start-episode: 0
+optimizer: rmsprop # {rmsprop, adam}
+train: true
+test: true
+mode: vanilla # {vanilla, stacked, conv-stacked}
+
+task:
+  max-length: 100
+  num-trials: 6
+  num-actions: 3
+
+  train-episodes: 100_000 
+  test-episodes: 500
+
+agent:
+  mem-units: 128
+
+  dict-len: 100_000
+  dict-kernel: cosine
+
+  n-workers: 32
+  share-optim: true
+  
+  value-loss-weight: 0.4
+  entropy-weight: 0.001
+  max-grad-norm: 0.
+  
+  gae-lambda: 1.
+  gamma: .91
+  lr: 7.5e-4
+  weight-decay: 0
+
+  n-step-update: 20 
+
