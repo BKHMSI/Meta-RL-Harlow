@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 class A3C_LSTM(nn.Module):
 
-    def __init__(self, config, num_actions):
+    def __init__(self, mem_units, num_actions):
         super(A3C_LSTM, self).__init__()
 
         self.encoder = nn.Sequential(
@@ -17,9 +17,9 @@ class A3C_LSTM(nn.Module):
             nn.ReLU()
         )
         
-        self.actor = nn.Linear(config["mem-units"], num_actions)
-        self.critic = nn.Linear(config["mem-units"], 1)
-        self.working_memory = nn.LSTM(64+4, config["mem-units"])
+        self.actor = nn.Linear(mem_units, num_actions)
+        self.critic = nn.Linear(mem_units, 1)
+        self.working_memory = nn.LSTM(64+4, mem_units)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
@@ -40,10 +40,10 @@ class A3C_LSTM(nn.Module):
 
         h_t, mem_state = self.working_memory(mem_input, mem_state)
 
-        action_dist = F.softmax(self.actor(h_t), dim=-1)
+        action_logits  = self.actor(h_t)
         value_estimate = self.critic(h_t)
 
-        return action_dist, value_estimate, mem_state
+        return action_logits, value_estimate, mem_state
 
     def get_init_states(self, device='cpu'):
         h0 = T.zeros(1, 1, self.working_memory.hidden_size).float().to(device)

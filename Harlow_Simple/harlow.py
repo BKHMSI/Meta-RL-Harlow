@@ -2,14 +2,20 @@ import os
 import sys 
 import imageio
 import numpy as np 
+import matplotlib.pyplot as plt 
 
 class HarlowSimple:
     """A 1D variant of the Harlow Task.
     """  
-    def __init__(self, verbose = False):
+    def __init__(self, 
+        verbose = False, 
+        visualize = False,
+        save_path = None,
+        save_interval = None 
+    ):
 
         '''environment constants'''
-        self.max_length = 75
+        self.max_length = 250
         self.n_trials   = 6
         self.n_actions  = 3 
         self.n_objects  = 1000
@@ -23,12 +29,25 @@ class HarlowSimple:
         
         self.episode_num = 0
         self.verbose = verbose 
+        self.visualize = visualize
         self.center = self.state_len // 2
-        self.reset()
+
+        if self.visualize:
+            self.frames = []
+            self._create_palette()
+            self.save_path = save_path
+            self.save_interval = save_interval
 
     @property
     def current(self):
         return self.state[self.center]
+
+    def _create_palette(self):
+        self.palette = []
+        for _ in range(self.n_objects):
+            color = list(np.random.choice(range(256), size=3))
+            if color not in self.palette:
+                self.palette += [color]
 
     def _place_objects(self):
         self.state[self.center-self.obj_offset] = self.obj_1
@@ -80,6 +99,9 @@ class HarlowSimple:
             print(f"Observation: {obs}")
             print(f"Reward: {reward} | Pointer: {self.pointer}")
 
+        if self.visualize:
+            self._add_frames(obs)
+
         done = self.trial_num >= self.n_trials or self.time_step >= self.max_length
         return obs, reward, done, self.time_step 
 
@@ -89,6 +111,10 @@ class HarlowSimple:
         self.time_step = 0
         self.episode_num += 1
         self.pointer = self.center
+
+        if self.visualize and len(self.frames) > 0 and self.episode_num % self.save_interval == 0:
+            self._save_frames()
+        self.frames = []
 
         # initialize state
         self.state = np.zeros(self.state_len)
@@ -101,6 +127,10 @@ class HarlowSimple:
         self.pointer -= shift 
 
         obs = self.observation()
+
+        if self.visualize:
+            self._add_frames(obs)
+
         if self.verbose:
             print(f"Observation: {obs}")
             print(f"Pointer: {self.pointer}")
@@ -112,9 +142,33 @@ class HarlowSimple:
             size=2
         )
 
+        self.obj_1 /= self.n_objects 
+        self.obj_2 /= self.n_objects 
+
         self.reward_obj = np.random.rand() < 0.5
 
         return obs 
+
+    def _visualize_obs(self, obs):
+        size = 20
+        bar = np.zeros((size, size*(obs.shape[0]), 3), dtype=np.uint8)
+        for i, cell in enumerate(obs):
+            if cell == 1:
+                bar[:,i*size:i*size+size] = [255, 255, 255]
+            elif cell > 0:
+                idx = int(cell*self.n_objects)
+                bar[:,i*size:i*size+size] = self.palette[idx]
+        return bar 
+
+    def _add_frames(self, obs):
+        bar = self._visualize_obs(obs)
+        for _ in range(10):
+            self.frames += [bar]
+
+    def _save_frames(self):
+        filepath = self.save_path.format(epi=self.episode_num)
+        imageio.mimsave(filepath, self.frames)
+
 
 if __name__ == "__main__":
     

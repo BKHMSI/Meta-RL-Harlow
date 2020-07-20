@@ -40,7 +40,7 @@ def train(config,
 
     env = HarlowSimple()
     if config["mode"] == "vanilla":
-        agent = A3C_LSTM(config["agent"], env.n_actions)
+        agent = A3C_LSTM(config["agent"]["mem-units"], env.n_actions)
     else:
         raise ValueError(config["mode"])
 
@@ -56,7 +56,7 @@ def train(config,
 
     if rank % 4 == 0:
         writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
-    save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
+    save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+f"_{rank}"+"_{epi:04d}")
     save_interval = config["save-interval"]
 
     done = True 
@@ -124,7 +124,7 @@ def train(config,
                     writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
 
                 episode_reward = 0
-                if env.episode_num % save_interval == 0 and rank == 0:
+                if env.episode_num % save_interval == 0 and rank % 4 == 0:
                     T.save({
                         "state_dict": shared_model.state_dict(),
                         "avg_reward_100": avg_reward_100,
