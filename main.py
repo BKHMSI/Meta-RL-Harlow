@@ -32,7 +32,7 @@ if __name__ == "__main__":
     n_seeds = 10
     base_seed = config["seed"]
     base_run_title = config["run-title"]
-    for seed_idx in range(1, n_seeds + 1):
+    for seed_idx in range(2, n_seeds + 1):
         config["run-title"] = base_run_title + f"_{seed_idx}"
         config["seed"] = base_seed * seed_idx
         

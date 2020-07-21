@@ -19,7 +19,7 @@ class HarlowSimple:
         self.n_trials   = 6
         self.n_actions  = 3 
         self.n_objects  = 1000
-        self.n_episodes = 10_000
+        self.n_episodes = 2500
         self.state_len  = 17 # size of state
         self.obs_length = 8  # size of receptive field
         self.obj_offset = 3  
@@ -46,7 +46,7 @@ class HarlowSimple:
 
     def _create_palette(self):
         self.palette = []
-        for _ in range(self.n_objects*2):
+        for _ in range(self.n_objects):
             color = list(np.random.choice(range(256), size=3))
             if color not in self.palette:
                 self.palette += [color]
@@ -148,8 +148,8 @@ class HarlowSimple:
             size=2
         )
 
-        self.obj_1 /= self.n_objects*2 
-        self.obj_2 /= self.n_objects*2
+        self.obj_1 /= self.n_objects
+        self.obj_2 /= self.n_objects
 
         self.reward_obj = np.random.rand() < 0.5
 
@@ -162,7 +162,7 @@ class HarlowSimple:
             if cell == 1:
                 bar[:,i*size:i*size+size] = [255, 255, 255]
             elif cell > 0:
-                idx = int(cell*self.n_objects*2)
+                idx = int(cell*self.n_objects)
                 bar[:,i*size:i*size+size] = self.palette[idx]
         return bar 
 

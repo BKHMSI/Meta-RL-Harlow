@@ -57,7 +57,7 @@ def train(config,
     entropy_coeff = config["agent"]["entropy-weight"]
     n_step_update = config["agent"]["n-step-update"]
 
-    if rank % 4 == 0:
+    if rank % 2 == 0:
         writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
     save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+f"_{rank}"+"_{epi:04d}")
     save_interval = config["save-interval"]
@@ -121,7 +121,7 @@ def train(config,
                 state = env.reset()
                 total_rewards += [episode_reward]
                 
-                if rank % 4 == 0:
+                if rank % 2 == 0:
                     avg_reward_100 = np.array(total_rewards[-100:]).mean()
                     writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
                     writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
@@ -171,10 +171,10 @@ def train(config,
 
         update_counter += 1
 
-        if rank % 4 == 0:
+        if rank % 2 == 0:
             writer.add_scalar("losses/total_loss", loss.item(), update_counter)
 
         if env.episode_num > env.n_episodes:
-            if rank % 4 == 0:
+            if rank % 2 == 0:
                 np.save(save_path.format(epi=env.n_episodes) + "_rewards.npy", env.reward_counter)
             break 

@@ -10,14 +10,14 @@ class A3C_LSTM(nn.Module):
     def __init__(self, input_dim, hidden_size, num_actions):
         super(A3C_LSTM, self).__init__()
 
-        # self.encoder = nn.Sequential(
-        #     nn.Linear(9, 32),
-        #     nn.ReLU(),
-        #     nn.Linear(32, 64),
-        #     nn.ReLU()
-        # )
+        self.encoder = nn.Sequential(
+            nn.Linear(9, 32),
+            nn.ReLU(),
+            nn.Linear(32, 64),
+            nn.ReLU(),
+        )
 
-        self.working_memory = nn.LSTM(input_dim, hidden_size)
+        self.working_memory = nn.LSTM(64+4, hidden_size)
         
         self.actor = nn.Linear(hidden_size, num_actions)
         self.critic = nn.Linear(hidden_size, 1)
@@ -33,24 +33,7 @@ class A3C_LSTM(nn.Module):
         if mem_state is None:
             mem_state = self.get_init_states()
 
-        mem_input = T.cat((obs, *p_input), dim=-1)
-        if len(mem_input.size()) == 2:
-            mem_input = mem_input.unsqueeze(0)
-
-        h_t, mem_state = self.working_memory(mem_input, mem_state)
-
-        action_logits  = self.actor(h_t)
-        value_estimate = self.critic(h_t)
-
-        return action_logits, value_estimate, mem_state
-
-    def forward_w_encoder(self, obs, p_input, mem_state=None):
-
-        if mem_state is None:
-            mem_state = self.get_init_states()
-
-        feats = self.encoder(obs.unsqueeze(0))
-
+        feats = self.encoder(obs)
         mem_input = T.cat((feats, *p_input), dim=-1)
         if len(mem_input.size()) == 2:
             mem_input = mem_input.unsqueeze(0)
