@@ -13,9 +13,8 @@ from tqdm import tqdm
 from collections import namedtuple
 
 from common.shared_optim import SharedAdam, SharedRMSprop
-from Harlow_Simple.train import train, train_stacked
+from Harlow_Simple.train import train
 from models.a3c_lstm_simple import A3C_LSTM
-from models.a3c_conv_lstm import A3C_ConvLSTM
 
    
 if __name__ == "__main__":
@@ -30,7 +29,7 @@ if __name__ == "__main__":
     with open(args.config, 'r', encoding="utf-8") as fin:
         config = yaml.load(fin, Loader=yaml.FullLoader)
 
-    n_seeds = 1
+    n_seeds = 10
     base_seed = config["seed"]
     base_run_title = config["run-title"]
     for seed_idx in range(1, n_seeds + 1):
@@ -49,7 +48,11 @@ if __name__ == "__main__":
         print(f"> Running {config['run-title']} {config['mode']} using {config['optimizer']}")
 
         if config["mode"] == "vanilla":
-            shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
+            shared_model = A3C_LSTM(
+                config["task"]["input-dim"],
+                config["agent"]["mem-units"], 
+                config["task"]["num-actions"],
+            )
         else:
             raise ValueError(config["mode"])
 
@@ -77,9 +80,8 @@ if __name__ == "__main__":
             print(f"> Loading Checkpoint {filepath}")
             shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
-        train_target = train_stacked if "stacked" in config["mode"] else train
         for rank in range(config["agent"]["n-workers"]):
-            p = mp.Process(target=train_target, args=(
+            p = mp.Process(target=train, args=(
                 config,
                 shared_model,
                 optimizer,

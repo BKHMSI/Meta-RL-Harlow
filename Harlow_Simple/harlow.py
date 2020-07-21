@@ -19,6 +19,7 @@ class HarlowSimple:
         self.n_trials   = 6
         self.n_actions  = 3 
         self.n_objects  = 1000
+        self.n_episodes = 10_000
         self.state_len  = 17 # size of state
         self.obs_length = 8  # size of receptive field
         self.obj_offset = 3  
@@ -31,6 +32,7 @@ class HarlowSimple:
         self.verbose = verbose 
         self.visualize = visualize
         self.center = self.state_len // 2
+        self.reward_counter = np.zeros((self.n_episodes,self.n_trials))
 
         if self.visualize:
             self.frames = []
@@ -44,7 +46,7 @@ class HarlowSimple:
 
     def _create_palette(self):
         self.palette = []
-        for _ in range(self.n_objects):
+        for _ in range(self.n_objects*2):
             color = list(np.random.choice(range(256), size=3))
             if color not in self.palette:
                 self.palette += [color]
@@ -87,10 +89,14 @@ class HarlowSimple:
             self._place_objects()
         elif self.current == self.obj_1:
             reward = self.obj_reward if self.reward_obj else -self.obj_reward
+            if self.reward_obj:
+                self.reward_counter[self.episode_num-1][self.trial_num] = 1
             self.trial_num += 1
             self._place_fixation()
         elif self.current == self.obj_2:
             reward = self.obj_reward if not self.reward_obj else -self.obj_reward
+            if not self.reward_obj:
+                self.reward_counter[self.episode_num-1][self.trial_num] = 1
             self.trial_num += 1
             self._place_fixation()
 
@@ -142,8 +148,8 @@ class HarlowSimple:
             size=2
         )
 
-        self.obj_1 /= self.n_objects 
-        self.obj_2 /= self.n_objects 
+        self.obj_1 /= self.n_objects*2 
+        self.obj_2 /= self.n_objects*2
 
         self.reward_obj = np.random.rand() < 0.5
 
@@ -156,7 +162,7 @@ class HarlowSimple:
             if cell == 1:
                 bar[:,i*size:i*size+size] = [255, 255, 255]
             elif cell > 0:
-                idx = int(cell*self.n_objects)
+                idx = int(cell*self.n_objects*2)
                 bar[:,i*size:i*size+size] = self.palette[idx]
         return bar 
 

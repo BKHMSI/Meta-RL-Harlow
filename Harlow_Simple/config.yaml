@@ -1,11 +1,11 @@
-run-title: HarlowSimple_6_1
+run-title: HarlowSimple_9
 load-title: HarlowSimple_3_1
-seed: 1
-device: cpu
+seed: 1000
+device: cuda
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
-log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_1
 load-path: ckpt/HarlowSimple_6_1/HarlowSimple_6_1_0_12500.pt
-save-interval: 500
+save-interval: 1000
 resume: false
 start-episode: 0
 optimizer: rmsprop # {rmsprop, adam}
@@ -17,6 +17,7 @@ task:
   max-length: 250
   num-trials: 6
   num-actions: 3
+  input-dim: 13
 
   train-episodes: 10_000 
   test-episodes: 500
@@ -27,7 +28,7 @@ agent:
   dict-len: 100_000
   dict-kernel: cosine
 
-  n-workers: 12
+  n-workers: 8
   share-optim: true
   
   value-loss-weight: 0.4
