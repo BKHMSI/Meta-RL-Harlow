@@ -28,9 +28,9 @@ def run_episode(agent, env, device="cpu"):
     while not done:
 
         logit, _, (ht, ct) = agent(
-            T.tensor(state).float().to(device), (
-            T.tensor(p_action).unsqueeze(0).float().to(device), 
-            T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+            T.tensor([state]).float().to(device), (
+            T.tensor([p_action]).float().to(device), 
+            T.tensor([[p_reward]]).float().to(device)), 
             (ht, ct)
         )
 
@@ -56,11 +56,14 @@ if __name__ == "__main__":
     load_path = config["load-path"]
     save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}.gif")
 
-    agent = A3C_LSTM(mem_units=config["agent"]["mem-units"], num_actions=3)
-    agent.load_state_dict(T.load(load_path)["state_dict"])
-
+    agent = A3C_LSTM(
+        config["task"]["input-dim"],
+        config["agent"]["mem-units"], 
+        config["task"]["num-actions"],
+    )
+    agent.load_state_dict(T.load(load_path)["state_dict"])    
+        
     env = HarlowSimple(visualize=True, save_interval=1, save_path=save_path)
-
     run_episode(agent, env)
 
     

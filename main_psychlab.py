@@ -12,11 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm 
 from collections import namedtuple
 
-# import deepmind_lab as lab 
-
-from shared_optim import SharedAdam, SharedRMSprop
-from train import train, train_stacked
-from harlow import HarlowWrapper
+from common.shared_optim import SharedAdam, SharedRMSprop
+from Harlow_PsychLab.train import train, train_stacked
+from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 from models.a3c_conv_lstm import A3C_ConvLSTM
 
@@ -28,7 +26,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Paramaters')
     parser.add_argument('-c', '--config',  type=str, 
-                        default="/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/config.yaml", 
+                        default="/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/Harlow_PsychLab/config.yaml", 
                         help='path of config file')
     parser.add_argument('--length', type=int, default=3600,
                         help='Number of steps to run the agent')

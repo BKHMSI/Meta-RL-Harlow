@@ -15,7 +15,7 @@ from collections import namedtuple
 
 import deepmind_lab as lab 
 
-from harlow import HarlowWrapper
+from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 from models.a3c_conv_lstm import A3C_ConvLSTM
 

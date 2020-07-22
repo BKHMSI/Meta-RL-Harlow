@@ -1,10 +1,10 @@
-run-title: HarlowSimple_11
+run-title: HarlowSimple_11_1
 load-title: HarlowSimple_3_1
 seed: 100
 device: cuda
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
 log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_2
-load-path: ckpt/HarlowSimple_6_1/HarlowSimple_6_1_0_12500.pt
+load-path: ckpt/HarlowSimple_11_1/HarlowSimple_11_1_0_5000.pt
 save-interval: 1000
 resume: false
 start-episode: 0 
