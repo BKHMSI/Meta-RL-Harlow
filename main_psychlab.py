@@ -16,7 +16,7 @@ from common.shared_optim import SharedAdam, SharedRMSprop
 from Harlow_PsychLab.train import train, train_stacked
 from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
-from models.a3c_conv_lstm import A3C_ConvLSTM
+from models.a3c_conv_lstm import A3C_ConvLSTM, A3C_ConvStackedLSTM
 
    
 if __name__ == "__main__":
@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Paramaters')
     parser.add_argument('-c', '--config',  type=str, 
-                        default="/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/Harlow_PsychLab/config.yaml", 
+                        default="/home/ubuntu/lab/Meta-RL-Harlow/Harlow_PsychLab/config.yaml", 
                         help='path of config file')
     parser.add_argument('--length', type=int, default=3600,
                         help='Number of steps to run the agent')
@@ -89,14 +89,17 @@ if __name__ == "__main__":
         print(f"> Running {config['run-title']} {config['mode']} using {config['optimizer']}")
 
         if config["mode"] == "conv-stacked":
-            shared_model = A3C_ConvLSTM(config["agent"], config["task"]["num-actions"])
+            shared_model = A3C_ConvStackedLSTM(config["agent"], config["task"]["num-actions"])
         elif config["mode"] == "stacked":
             shared_model = A3C_StackedLSTM(config["agent"], config["task"]["num-actions"])
+        elif config["mode"] == "conv-vanilla":
+            shared_model = A3C_ConvLSTM(config["agent"], config["task"]["num-actions"])
         elif config["mode"] == "vanilla":
             shared_model = A3C_LSTM(config["agent"], config["task"]["num-actions"])
         else:
             raise ValueError(config["mode"])
-
+        
+        print(shared_model)
         shared_model.share_memory()
         shared_model.to(config['device'])
 
