@@ -15,9 +15,9 @@ from collections import namedtuple
 
 import deepmind_lab as lab 
 
-from harlow import HarlowWrapper
+from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
-from models.a3c_conv_lstm import A3C_ConvLSTM
+from models.a3c_conv_lstm import A3C_ConvLSTM, A3C_ConvStackedLSTM
 
 def ensure_shared_grads(model, shared_model):
     for param, shared_param in zip(model.parameters(), 
@@ -43,7 +43,9 @@ def train(config,
 
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
-    if config["mode"] == "vanilla":
+    if config["mode"] == "conv-vanilla":
+        agent = A3C_ConvLSTM(config["agent"], env.num_actions)
+    elif config["mode"] == "vanilla":
         agent = A3C_LSTM(config["agent"], env.num_actions)
     else:
         raise ValueError(config["mode"])
@@ -58,8 +60,7 @@ def train(config,
     entropy_coeff = config["agent"]["entropy-weight"]
     n_step_update = config["agent"]["n-step-update"]
 
-    if rank % 4 == 0:
-        writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
+    writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
     save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
     save_interval = config["save-interval"]
 
@@ -74,7 +75,6 @@ def train(config,
     episode_reward = 0
     update_counter = 0
     total_rewards = []
-    reward_counter = 0
 
     while True:
 
@@ -89,13 +89,12 @@ def train(config,
         rewards = []
         entropies = []
 
-        start_time = datetime.now()
         for _ in range(n_step_update):
 
             logit, value, (ht, ct) = agent(
-                T.tensor(state).to(device), (
-                T.tensor(p_action).unsqueeze(0).float().to(device), 
-                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                T.tensor([state]).to(device), (
+                T.tensor([p_action]).unsqueeze(0).float().to(device), 
+                T.tensor([[p_reward]]).unsqueeze(0).float().to(device)), 
                 (ht, ct)
             )
 
@@ -124,17 +123,16 @@ def train(config,
                 state = env.reset()
                 total_rewards += [episode_reward]
                 
-                if rank % 4 == 0:
-                    avg_reward_100 = np.array(total_rewards[max(0, reward_counter-100):(reward_counter+1)]).mean()
-                    writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
-                    writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
+                avg_reward_100 = np.array(total_rewards[-100:]).mean()
+                writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
+                writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
 
-                reward_counter += 1
                 episode_reward = 0
-                if env.episode_num % save_interval == 0 and rank == 0:
+                if env.episode_num % save_interval == 0:
                     T.save({
                         "state_dict": shared_model.state_dict(),
                         "avg_reward_100": avg_reward_100,
+                        "update_counter": update_counter
                     }, save_path.format(epi=env.episode_num) + ".pt")
 
                 break 
@@ -174,10 +172,7 @@ def train(config,
         optimizer.step()
 
         update_counter += 1
-
-        print(f"Elapsed Time: {datetime.now() - start_time}")
-        if rank % 4 == 0:
-            writer.add_scalar("losses/total_loss", loss.item(), update_counter)
+        writer.add_scalar("losses/total_loss", loss.item(), update_counter)
 
 
 def train_stacked(config, 
@@ -214,7 +209,6 @@ def train_stacked(config,
     entropy_coeff = config["agent"]["entropy-weight"]
     n_step_update = config["agent"]["n-step-update"]
 
-    # if rank % 4 == 0:
     writer = SummaryWriter(log_dir=os.path.join(config["log-path"], config["run-title"] + f"_{rank}"))
     save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}")
     save_interval = config["save-interval"]
@@ -249,9 +243,9 @@ def train_stacked(config,
         for _ in range(n_step_update):
 
             logit, value, (ht1, ct1), (ht2, ct2) = agent(
-                T.tensor(state).to(device), (
-                T.tensor(p_action).unsqueeze(0).float().to(device), 
-                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                T.tensor([state]).to(device), (
+                T.tensor([p_action]).float().to(device), 
+                T.tensor([[p_reward]]).float().to(device)), 
                 (ht1, ct1), (ht2, ct2)
             )
 
@@ -280,7 +274,6 @@ def train_stacked(config,
                 state = env.reset()
                 total_rewards += [episode_reward]
                 
-                # if rank % 4 == 0:
                 avg_reward_100 = np.array(total_rewards[-100:]).mean()
                 writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
                 writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
@@ -290,6 +283,7 @@ def train_stacked(config,
                     T.save({
                         "state_dict": shared_model.state_dict(),
                         "avg_reward_100": avg_reward_100,
+                        "update_counter": update_counter
                     }, save_path.format(epi=env.episode_num) + ".pt")
 
                 break 
@@ -297,9 +291,9 @@ def train_stacked(config,
         R = T.zeros(1, 1).to(device)
         if not done:
             _, value, _, _ = agent(
-                T.tensor(state).to(device), (
-                T.tensor(p_action).unsqueeze(0).float().to(device), 
-                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                T.tensor([state]).to(device), (
+                T.tensor([p_action]).float().to(device), 
+                T.tensor([[p_reward]]).float().to(device)), 
                 (ht1, ct1), (ht2, ct2)
             )
             R = value.detach()
@@ -329,5 +323,4 @@ def train_stacked(config,
         optimizer.step()
 
         update_counter += 1
-        # if rank % 4 == 0:
         writer.add_scalar("losses/total_loss", loss.item(), update_counter)

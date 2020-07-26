@@ -19,6 +19,7 @@ class HarlowSimple:
         self.n_trials   = 6
         self.n_actions  = 3 
         self.n_objects  = 1000
+        self.n_episodes = 2500
         self.state_len  = 17 # size of state
         self.obs_length = 8  # size of receptive field
         self.obj_offset = 3  
@@ -31,6 +32,7 @@ class HarlowSimple:
         self.verbose = verbose 
         self.visualize = visualize
         self.center = self.state_len // 2
+        self.reward_counter = np.zeros((self.n_episodes,self.n_trials))
 
         if self.visualize:
             self.frames = []
@@ -82,25 +84,32 @@ class HarlowSimple:
         elif self.pointer < 0:
             self.pointer = self.state_len - 1
 
+        if self.current != 0 and self.visualize:
+            self._add_frames(self.observation())
+
         if self.current == 1:
             reward = self.fix_reward
             self._place_objects()
         elif self.current == self.obj_1:
             reward = self.obj_reward if self.reward_obj else -self.obj_reward
+            if self.reward_obj:
+                self.reward_counter[self.episode_num-1][self.trial_num] = 1
             self.trial_num += 1
             self._place_fixation()
         elif self.current == self.obj_2:
             reward = self.obj_reward if not self.reward_obj else -self.obj_reward
+            if not self.reward_obj:
+                self.reward_counter[self.episode_num-1][self.trial_num] = 1
             self.trial_num += 1
             self._place_fixation()
 
         obs = self.observation()
+        if self.visualize:
+            self._add_frames(obs)
+
         if self.verbose:
             print(f"Observation: {obs}")
             print(f"Reward: {reward} | Pointer: {self.pointer}")
-
-        if self.visualize:
-            self._add_frames(obs)
 
         done = self.trial_num >= self.n_trials or self.time_step >= self.max_length
         return obs, reward, done, self.time_step 
@@ -142,8 +151,8 @@ class HarlowSimple:
             size=2
         )
 
-        self.obj_1 /= self.n_objects 
-        self.obj_2 /= self.n_objects 
+        self.obj_1 /= self.n_objects
+        self.obj_2 /= self.n_objects
 
         self.reward_obj = np.random.rand() < 0.5
 
@@ -151,14 +160,21 @@ class HarlowSimple:
 
     def _visualize_obs(self, obs):
         size = 20
+        background = np.ones((size*5, size*(obs.shape[0]), 3), dtype=np.uint8) * 255
         bar = np.zeros((size, size*(obs.shape[0]), 3), dtype=np.uint8)
         for i, cell in enumerate(obs):
             if cell == 1:
-                bar[:,i*size:i*size+size] = [255, 255, 255]
+                # draw fixation cross
+                bar[0:9,i*size:i*size+9] = [255, 0, 0]
+                bar[0:9,i*size+11:i*size+20] = [255, 0, 0]
+                bar[11:20,i*size+11:i*size+20] = [255, 0, 0]
+                bar[11:20,i*size:i*size+9] = [255, 0, 0]
             elif cell > 0:
                 idx = int(cell*self.n_objects)
                 bar[:,i*size:i*size+size] = self.palette[idx]
-        return bar 
+
+        background[size*2:size*3] = bar
+        return background 
 
     def _add_frames(self, obs):
         bar = self._visualize_obs(obs)

@@ -42,11 +42,11 @@ class HarlowWrapper:
 
     if reward in [-5, 5]:
       self.trial_num += 1
-
-    if reward == 0:
-      reward = -0.01
     
-    # reward = reward / 5. 
+    if reward == -5 or reward == 1:
+      reward = 0
+
+    reward = reward / 5. 
 
     timestep = self.num_steps() 
     done = not self.env.is_running() or timestep > self.max_length or self.trial_num >= self.num_trials

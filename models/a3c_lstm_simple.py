@@ -10,19 +10,20 @@ from models.ep_lstm import EpLSTM
 
 class A3C_LSTM(nn.Module):
 
-    def __init__(self, mem_units, num_actions):
+    def __init__(self, input_dim, hidden_size, num_actions):
         super(A3C_LSTM, self).__init__()
 
         self.encoder = nn.Sequential(
             nn.Linear(9, 32),
             nn.ReLU(),
             nn.Linear(32, 64),
-            nn.ReLU()
+            nn.ReLU(),
         )
+
+        self.working_memory = nn.LSTM(64+4, hidden_size)
         
-        self.actor = nn.Linear(mem_units, num_actions)
-        self.critic = nn.Linear(mem_units, 1)
-        self.working_memory = nn.LSTM(64+4, mem_units)
+        self.actor = nn.Linear(hidden_size, num_actions)
+        self.critic = nn.Linear(hidden_size, 1)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
@@ -35,8 +36,7 @@ class A3C_LSTM(nn.Module):
         if mem_state is None:
             mem_state = self.get_init_states()
 
-        feats = self.encoder(obs.unsqueeze(0))
-
+        feats = self.encoder(obs)
         mem_input = T.cat((feats, *p_input), dim=-1)
         if len(mem_input.size()) == 2:
             mem_input = mem_input.unsqueeze(0)

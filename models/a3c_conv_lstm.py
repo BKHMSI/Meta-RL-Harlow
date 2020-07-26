@@ -37,8 +37,8 @@ class Encoder(nn.Module):
             2*n_channel, 
             'M', 
             4*n_channel, 
-            4*n_channel, 
-            'M', 
+            # 4*n_channel, 
+            # 'M', 
             # (8*n_channel, 0), 
             # 'M'
         ]
@@ -49,6 +49,63 @@ class Encoder(nn.Module):
         return self.features(inputs)
 
 class A3C_ConvLSTM(nn.Module):
+
+    def __init__(self, config, num_actions, pretrained=True):
+        super(A3C_ConvLSTM, self).__init__()
+    
+        self.encoder = Encoder(config["conv-nchannels"])
+        if pretrained:
+            m = model_zoo.load_url(model_urls['cifar100'], map_location=T.device('cpu'))
+            pretrained_dict = m.state_dict() if isinstance(m, nn.Module) else m
+            # for i, (k, v) in enumerate(pretrained_dict.items()): print(i, k, v.size())
+            pretrained_dict = {
+                k: v for i, (k, v) in enumerate(pretrained_dict.items()) 
+                if i < 20
+            }
+            self.encoder.load_state_dict(pretrained_dict)
+
+        self.last_conv = make_layers(
+            [(2*config["conv-nchannels"], 0), 'M'], 
+            batch_norm=True,
+            in_channels=4*config["conv-nchannels"]
+        )
+
+        self.actor = nn.Linear(config["mem-units"], num_actions)
+        self.critic = nn.Linear(config["mem-units"], 1)
+        self.working_memory = nn.LSTM(4096+4, config["mem-units"])
+        
+        # intialize actor and critic weights
+        T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
+        self.actor.bias.data.fill_(0)
+        T.nn.init.orthogonal_(self.critic.weight.data, 1)
+        self.critic.bias.data.fill_(0)
+
+    def forward(self, obs, p_input, mem_state=None):
+
+        p_action, p_reward = p_input
+
+        if mem_state is None:
+            mem_state = self.get_init_states(layer=1)
+
+        feats = self.last_conv(self.encoder(obs))
+        feats = feats.view(1, feats.size(0), -1)
+
+        mem_input = T.cat((feats, *p_input), dim=-1)
+        h_t, mem_state = self.working_memory(mem_input, mem_state)
+        
+        action_logits = self.actor(h_t)
+        value_estimate = self.critic(h_t)
+
+        return action_logits, value_estimate, mem_state
+
+    def get_init_states(self, layer, device='cuda'):
+        hsize = self.working_memory.hidden_size
+        h0 = T.zeros(1, 1, hsize).float().to(device)
+        c0 = T.zeros(1, 1, hsize).float().to(device)
+        return (h0, c0)
+
+
+class A3C_ConvStackedLSTM(nn.Module):
 
     def __init__(self, config, num_actions, pretrained=True):
         super(A3C_ConvLSTM, self).__init__()
@@ -105,10 +162,10 @@ class A3C_ConvLSTM(nn.Module):
 
         output_2, state_2 = self.lstm_2(input_2, state_2)
         
-        action_dist = F.softmax(self.actor(output_2), dim=-1)
+        action_logits = self.actor(output_2)
         value_estimate = self.critic(output_2)
 
-        return action_dist, value_estimate, state_1, state_2
+        return action_logits, value_estimate, state_1, state_2
 
     def get_init_states(self, layer, device='cuda'):
         hsize = self.lstm_1.hidden_size if layer == 1 else self.lstm_2.hidden_size
