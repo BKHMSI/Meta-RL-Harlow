@@ -2,7 +2,7 @@ import os
 import imageio
 import numpy as np 
 
-PIXELS_PER_ACTION = 1
+PIXELS_PER_ACTION = 2
 
 class HarlowWrapper:
   """A gym-like wrapper environment for DeepMind Lab.
@@ -71,6 +71,11 @@ class HarlowWrapper:
   def num_steps(self):
     return self.env.num_steps()
 
+  def snapshot(self):
+    obs = self.env.observations()['RGB_INTERLEAVED']
+    filepath = os.path.join(os.path.dirname(self.save_path), "snapshot.png")
+    imageio.imsave(filepath, obs)
+
   def _preprocess(self, obs):
     obs = obs.astype(np.float32)
     obs = obs / 255.0
@@ -83,3 +88,29 @@ class HarlowWrapper:
     """
     map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
     return np.array([map_actions[action],0,0,0,0,0,0], dtype=np.intc)
+
+if __name__ == "__main__":
+  import deepmind_lab as lab 
+
+  task_config = {
+        'fps': "60",
+        'width': "128",
+        'height': "128"
+  }
+
+  config = {
+    "run-title": "harlow-env-test",
+    "save-path": "./",
+    "start-episode": 0,
+    "task": {
+      "max-length": 3600,
+      "num-trials": 6
+    }
+  }
+
+  lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
+  env = HarlowWrapper(lab_env, config, 0)
+
+  obs = env.env.observations()['RGB_INTERLEAVED']
+  filepath = os.path.join(config["save-path"], config["run-title"] + ".png")
+  imageio.imsave(filepath, obs)

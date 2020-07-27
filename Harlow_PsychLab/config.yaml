@@ -1,9 +1,9 @@
-run-title: Harlow_24
+run-title: Harlow_25
 load-title: Harlow_21_1
-seed: 1995
+seed: 1234
 device: cuda
 save-path: /home/ubuntu/lab/Meta-RL-Harlow/ckpt
-log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_24
+log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_25
 save-interval: 100
 resume: false
 start-episode: 0
@@ -31,7 +31,7 @@ agent:
   dict-len: 100_000
   dict-kernel: cosine
 
-  n-workers: 12
+  n-workers: 6
   share-optim: true
   
   value-loss-weight: 0.4

@@ -43,6 +43,7 @@ def train(config,
 
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
+
     if config["mode"] == "conv-vanilla":
         agent = A3C_ConvLSTM(config["agent"], env.num_actions)
     elif config["mode"] == "vanilla":
@@ -93,8 +94,8 @@ def train(config,
 
             logit, value, (ht, ct) = agent(
                 T.tensor([state]).to(device), (
-                T.tensor([p_action]).unsqueeze(0).float().to(device), 
-                T.tensor([[p_reward]]).unsqueeze(0).float().to(device)), 
+                T.tensor([p_action]).float().to(device), 
+                T.tensor([[p_reward]]).float().to(device)), 
                 (ht, ct)
             )
 
@@ -109,6 +110,10 @@ def train(config,
             log_prob = log_prob.gather(1, action)
 
             state, reward, done, _ = env.step(int(action))
+
+            # if reward == 1:
+            #     env.snapshot()
+            #     exit()
 
             episode_reward += reward
 
@@ -140,9 +145,9 @@ def train(config,
         R = T.zeros(1, 1).to(device)
         if not done:
             _, value, _ = agent(
-                T.tensor(state).to(device), (
-                T.tensor(p_action).unsqueeze(0).float().to(device), 
-                T.tensor([p_reward]).unsqueeze(0).float().to(device)), 
+                T.tensor([state]).to(device), (
+                T.tensor([p_action]).float().to(device), 
+                T.tensor([[p_reward]]).float().to(device)), 
                 (ht, ct)
             )
             R = value.detach()

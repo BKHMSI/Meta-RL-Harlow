@@ -4,7 +4,7 @@ In this repository, I reproduce the results of [Prefrontal Cortex as a Meta-Rein
 
 *Note: I have a related repository on the ["Two-Step" task](https://github.com/BKHMSI/Meta-RL-TwoStep-Task) with episodic LSTMs in case you are interested :)
 
-**I am still working on reproducing the PsychLab results, training takes forever ¯\_(ツ)_/¯
+**I am still working on reproducing the PsychLab results, training takes forever ¯\\\_(ツ)\_/¯
 
 <table align="center" width="100%">
     <tr>
@@ -12,8 +12,8 @@ In this repository, I reproduce the results of [Prefrontal Cortex as a Meta-Rein
         <th>Harlow Simple</th>
     </tr>
     <tr>
-        <td align="center" width="50%"><img alt="PsychLab Demo" src="assets/Harlow_9500.gif"></td>
-        <td align="center" width="50%"><img alt="Simple Demo" src="assets/harlow_simple.gif"></td>
+        <td align="center" width="75%"><img alt="PsychLab Demo" src="assets/Harlow_25_1_0300.gif"></td>
+        <td align="center" width="25%"><img alt="Simple Demo" src="assets/harlow_simple.gif"></td>
     </tr>
 </table>
 
@@ -63,7 +63,23 @@ I am using the same model as presented in [Learning to Reinforcement Learn](http
 
 ## Getting Started with PsychLab 
 
-TODO
+1. Follow this [build documentation](https://github.com/deepmind/lab/blob/master/docs/users/build.md) from DeepMind Lab
+2. Clone this repository into the root directory of `lab`
+3. Edit `BUILD` by adding 
+    ```
+        py_binary(
+            name = "python_harlow",
+            srcs = ["Meta-RL-Harlow/main_psychlab.py"],
+            data = [":deepmind_lab.so"],
+            main = "Meta-RL-Harlow/main_psychlab.py",
+            visibility = ["//python/tests:__subpackages__"],
+            deps = ["@six_archive//:six"],
+        )
+    ```
+4. Run this command from the root directory of `lab`  
+    ```
+    bazel run :python_harlow -- --level_script contributed/psychlab/harlow --width=136 --height=136
+    ``` 
 
 
 ## Code Structure

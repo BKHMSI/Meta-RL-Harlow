@@ -14,7 +14,9 @@ class A3C_LSTM(nn.Module):
             nn.Conv2d(3, 16, kernel_size=(8, 8), stride=(4, 4)),  # output: (16, 20, 20)
             nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)), # output: (32, 9, 9)
             nn.Flatten(),
-            nn.Linear(32*9*9, 256),
+            # nn.Linear(32*9*9, 256),
+            # nn.Linear(6272, 256),
+            nn.Linear(7200, 256),
             nn.ReLU()
         )
         
@@ -33,13 +35,10 @@ class A3C_LSTM(nn.Module):
         if mem_state is None:
             mem_state = self.get_init_states()
 
-        feats = self.encoder(obs.unsqueeze(0))
+        feats = self.encoder(obs)
 
         # import pdb; pdb.set_trace()
-        mem_input = T.cat((feats, *p_input), dim=-1)
-        if len(mem_input.size()) == 2:
-            mem_input = mem_input.unsqueeze(0)
-
+        mem_input = T.cat((feats, *p_input), dim=-1).unsqueeze(0)
         h_t, mem_state = self.working_memory(mem_input, mem_state)
 
         action_logits = self.actor(h_t)
@@ -63,7 +62,7 @@ class A3C_StackedLSTM(nn.Module):
             nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)), # output: (32, 9, 9)
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(32*9*9, 256),
+            nn.Linear(7200, 256),
             nn.ReLU()
         )
         
