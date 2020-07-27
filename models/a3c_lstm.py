@@ -14,7 +14,9 @@ class A3C_LSTM(nn.Module):
             nn.Conv2d(3, 16, kernel_size=(8, 8), stride=(4, 4)),  # output: (16, 20, 20)
             nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)), # output: (32, 9, 9)
             nn.Flatten(),
-            nn.Linear(32*9*9, 256),
+            # nn.Linear(32*9*9, 256),
+            # nn.Linear(6272, 256),
+            nn.Linear(7200, 256),
             nn.ReLU()
         )
         
@@ -33,19 +35,16 @@ class A3C_LSTM(nn.Module):
         if mem_state is None:
             mem_state = self.get_init_states()
 
-        feats = self.encoder(obs.unsqueeze(0))
+        feats = self.encoder(obs)
 
         # import pdb; pdb.set_trace()
-        mem_input = T.cat((feats, *p_input), dim=-1)
-        if len(mem_input.size()) == 2:
-            mem_input = mem_input.unsqueeze(0)
-
+        mem_input = T.cat((feats, *p_input), dim=-1).unsqueeze(0)
         h_t, mem_state = self.working_memory(mem_input, mem_state)
 
-        action_dist = F.softmax(self.actor(h_t), dim=-1)
+        action_logits = self.actor(h_t)
         value_estimate = self.critic(h_t)
 
-        return action_dist, value_estimate, mem_state
+        return action_logits, value_estimate, mem_state
 
     def get_init_states(self, device='cpu'):
         h0 = T.zeros(1, 1, self.working_memory.hidden_size).float().to(device)
@@ -59,16 +58,18 @@ class A3C_StackedLSTM(nn.Module):
 
         self.encoder = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=(8, 8), stride=(4, 4)),  # output: (16, 20, 20)
+            nn.ReLU(),
             nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)), # output: (32, 9, 9)
+            nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(32*9*9, 256),
+            nn.Linear(7200, 256),
             nn.ReLU()
         )
         
-        self.actor = nn.Linear(64, num_actions)
-        self.critic = nn.Linear(64, 1)
+        self.actor = nn.Linear(128, num_actions)
+        self.critic = nn.Linear(128, 1)
         self.lstm_1 = nn.LSTM(256+1, config["mem-units"])
-        self.lstm_2 = nn.LSTM(256+config["mem-units"]+3, 64)
+        self.lstm_2 = nn.LSTM(256+config["mem-units"]+3, 128)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
@@ -86,24 +87,18 @@ class A3C_StackedLSTM(nn.Module):
         if state_2 is None:
             state_2 = self.get_init_states(layer=2)
 
-        feats = self.encoder(obs.unsqueeze(0))
+        feats = self.encoder(obs)
 
-        input_1 = T.cat((feats, p_reward), dim=-1)
-        if len(input_1.size()) == 2:
-            input_1 = input_1.unsqueeze(0)
-
+        input_1 = T.cat((feats, p_reward), dim=-1).unsqueeze(0)
         output_1, state_1 = self.lstm_1(input_1, state_1)
-
-        input_2 = T.cat((feats, output_1.squeeze(0), p_action), dim=-1)
-        if len(input_2.size()) == 2:
-            input_2 = input_2.unsqueeze(0)
-
+        
+        input_2 = T.cat((feats, output_1.squeeze(0), p_action), dim=-1).unsqueeze(0)
         output_2, state_2 = self.lstm_2(input_2, state_2)
         
-        action_dist = F.softmax(self.actor(output_2), dim=-1)
+        action_logits = self.actor(output_2)
         value_estimate = self.critic(output_2)
 
-        return action_dist, value_estimate, state_1, state_2
+        return action_logits, value_estimate, state_1, state_2
 
     def get_init_states(self, layer, device='cpu'):
         hsize = self.lstm_1.hidden_size if layer == 1 else self.lstm_2.hidden_size

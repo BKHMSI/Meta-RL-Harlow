@@ -53,7 +53,6 @@ class A3C_LSTM(nn.Module):
         c0 = T.zeros(1, 1, self.working_memory.hidden_size).float().to(device)
         return (h0, c0)
 
-
 class A3C_DND_LSTM(nn.Module):
 
     def __init__(self, 
