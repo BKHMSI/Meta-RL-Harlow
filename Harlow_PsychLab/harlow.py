@@ -2,7 +2,7 @@ import os
 import imageio
 import numpy as np 
 
-PIXELS_PER_ACTION = 2
+PIXELS_PER_ACTION = 1
 
 class HarlowWrapper:
   """A gym-like wrapper environment for DeepMind Lab.
@@ -43,8 +43,10 @@ class HarlowWrapper:
     if reward in [-5, 5]:
       self.trial_num += 1
     
-    if reward == -5 or reward == 1:
-      reward = 0
+    if reward == 0:
+      reward = -0.01
+    # elif reward == -5:
+    #   reward = 0
 
     reward = reward / 5. 
 

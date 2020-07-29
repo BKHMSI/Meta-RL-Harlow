@@ -1,12 +1,12 @@
-run-title: Harlow_25
-load-title: Harlow_21_1
+run-title: Harlow_26
+load-title: Harlow_25_1
 seed: 1234
 device: cuda
 save-path: /home/ubuntu/lab/Meta-RL-Harlow/ckpt
-log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_25
+log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_26
 save-interval: 100
-resume: false
-start-episode: 0
+resume: true
+start-episode: 3700
 optimizer: rmsprop # {rmsprop, adam}
 train: true
 test: true
