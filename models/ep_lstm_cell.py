@@ -106,7 +106,8 @@ class EpLSTMCell(nn.Module):
         for W in iw:
             nn.init.xavier_uniform_(W)
 
-    @T.jit.export
+    # @T.jit.export
+    @T.jit.ignore
     def get_init_state(self, input: Tensor) -> Tuple[Tensor, Tensor]:
         batch_size = input.shape[1]
         zeros = T.zeros(batch_size, self.Dh, device=input.device)
@@ -165,7 +166,8 @@ class EpLSTMCell(nn.Module):
 
         return ht, (ht, ct)
 
-    @T.jit.export
+    # @T.jit.export
+    @T.jit.ignore
     def loop(self, inputs, memories, state_t0, mask=None):
         # type: (Tensor, Tensor, Tuple[Tensor, Tensor], Optional[List[Tensor]]) -> Tuple[List[Tensor], Tuple[Tensor, Tensor]]
         '''

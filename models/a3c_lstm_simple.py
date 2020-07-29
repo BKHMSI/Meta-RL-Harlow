@@ -61,12 +61,14 @@ class A3C_DND_LSTM(nn.Module):
             num_actions,
             dict_len,
             kernel='l2', 
-            bias=True
+            bias=True,
+            device="cpu",
     ):
         super(A3C_DND_LSTM, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.bias = bias
+        self.device = device 
 
         self.encoder = nn.Sequential(
             nn.Linear(9, 32),
@@ -96,27 +98,27 @@ class A3C_DND_LSTM(nn.Module):
     def reset_parameters(self):
         # reset lstm parameters
         self.ep_lstm.reset_parameters()
+        # reset dnd 
+        self.reset_memory()
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight, gain=0.01)
         self.actor.bias.data.fill_(0)
         T.nn.init.orthogonal_(self.critic.weight, gain=1.0)
         self.critic.bias.data.fill_(0)
 
-    def forward(self, data, cue, mem_state):
-
-        obs, p_action, p_reward = data 
+    def forward(self, obs, p_input, mem_state):
 
         feats = self.encoder(obs)
-        x_t = T.cat((feats, p_action, p_reward), dim=-1)
+        x_t = T.cat((feats, *p_input), dim=-1)
 
-        m_t = self.dnd.get_memory(cue)
+        m_t = self.dnd.get_memory(feats).to(self.device)
     
         _, (h_t, c_t) = self.ep_lstm((x_t.unsqueeze(1), m_t.unsqueeze(1)), mem_state)
 
-        action_logits = self.actor(h_t))
+        action_logits = self.actor(h_t)
         value_estimate = self.critic(h_t)
 
-        return action_logits, value_estimate, (h_t, c_t)
+        return action_logits, value_estimate, (h_t, c_t), feats
         
     def pick_action(self, action_distribution):
         """action selection by sampling from a multinomial.

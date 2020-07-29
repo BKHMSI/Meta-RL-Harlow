@@ -13,8 +13,8 @@ from tqdm import tqdm
 from collections import namedtuple
 
 from common.shared_optim import SharedAdam, SharedRMSprop
-from Harlow_Simple.train import train
-from models.a3c_lstm_simple import A3C_LSTM
+from Harlow_Simple.train import train, train_episodic
+from models.a3c_lstm_simple import A3C_LSTM, A3C_DND_LSTM
 
    
 if __name__ == "__main__":
@@ -29,10 +29,10 @@ if __name__ == "__main__":
     with open(args.config, 'r', encoding="utf-8") as fin:
         config = yaml.load(fin, Loader=yaml.FullLoader)
 
-    n_seeds = 10
+    n_seeds = 1
     base_seed = config["seed"]
     base_run_title = config["run-title"]
-    for seed_idx in range(2, n_seeds + 1):
+    for seed_idx in range(1, n_seeds + 1):
         config["run-title"] = base_run_title + f"_{seed_idx}"
         config["seed"] = base_seed * seed_idx
         
@@ -53,6 +53,14 @@ if __name__ == "__main__":
                 config["agent"]["mem-units"], 
                 config["task"]["num-actions"],
             )
+        elif config["mode"] == "episodic":
+            shared_model = A3C_DND_LSTM(
+                config["task"]["input-dim"],
+                config["agent"]["mem-units"], 
+                config["task"]["num-actions"],
+                config["agent"]["dict-len"],
+                config["agent"]["dict-kernel"]
+            )
         else:
             raise ValueError(config["mode"])
 
@@ -64,8 +72,6 @@ if __name__ == "__main__":
         optimizer.share_memory()
    
         processes = []
-        counter = mp.Value('i', 0)
-        lock = mp.Lock()
         
         T.manual_seed(config["seed"])
         np.random.seed(config["seed"])
@@ -80,14 +86,13 @@ if __name__ == "__main__":
             print(f"> Loading Checkpoint {filepath}")
             shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
+        train_target = train_episodic if config["mode"] == "episodic" else train 
         for rank in range(config["agent"]["n-workers"]):
-            p = mp.Process(target=train, args=(
+            p = mp.Process(target=train_target, args=(
                 config,
                 shared_model,
                 optimizer,
                 rank,
-                lock,
-                counter,
             ))
             p.start()
             processes += [p]
