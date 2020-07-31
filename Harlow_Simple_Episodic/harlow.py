@@ -12,7 +12,7 @@ def _binary2int(binary):
 def _int2binary(decimal, length=10):
     return np.array([int(x) for x in format(decimal, f'#0{length+2}b')[2:]])
 
-class Harlow_1D:
+class HarlowEpisodic_1D:
     """A 1D episodic variant of the Harlow Task.
     """  
     def __init__(self, 
@@ -35,6 +35,8 @@ class Harlow_1D:
         self.obj_reward = 1
         self.time_step  = 0
         self.map_action = [0, 1, -1]
+        self.ctx_length = int(np.ceil(np.log2(self.n_objects)))
+        self._generate_contexts()
 
         self.episode_num = 0
         self.verbose = verbose 
@@ -51,6 +53,17 @@ class Harlow_1D:
     @property
     def current(self):
         return self.state[self.center]
+
+    @property
+    def stage(self):
+        return int(self.episode_num >= self.n_episodes // 2)
+
+    def _generate_contexts(self):
+        self.context_pool = np.arange(self.n_objects)
+        np.random.shuffle(self.context_pool)
+
+    def generate_uncue(self):
+        return np.ones(self.ctx_length) * -1
 
     def _place_objects(self):
         self.state[self.center-self.obj_offset] = self.obj_1
@@ -116,7 +129,6 @@ class Harlow_1D:
         done = self.trial_num >= self.n_trials or self.time_step >= self.max_length
         return obs, reward, done, self.time_step 
 
-
     def reset(self):
         self.trial_num = 0
         self.time_step = 0
@@ -153,7 +165,9 @@ class Harlow_1D:
             size=2
         )
 
-        self.reward_obj  = np.random.rand() < 0.5  
+        self.reward_obj  = np.random.rand() < 0.5
+        ctx_idx = self.context_pool[self.obj_1] if self.reward_obj else self.context_pool[self.obj_2]
+        self.context = _int2binary(ctx_idx, self.ctx_length)  
 
         self.obj_1 /= self.n_objects
         self.obj_2 /= self.n_objects
@@ -197,7 +211,7 @@ class Harlow_1D:
 
 if __name__ == "__main__":
     
-    env = Harlow_1D(verbose=True)
+    env = HarlowEpisodic_1D(verbose=True)
 
     while True:
         action = int(input("Left (1) or Right (2): "))

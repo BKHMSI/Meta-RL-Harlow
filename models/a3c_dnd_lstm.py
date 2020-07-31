@@ -71,10 +71,10 @@ class A2C_DND_LSTM(nn.Module):
     
         _, (h_t, c_t) = self.ep_lstm((x_t.unsqueeze(1), m_t.unsqueeze(1)), mem_state)
 
-        action_dist = F.softmax(self.actor(h_t), dim=-1)
+        action_logits  = self.actor(h_t)
         value_estimate = self.critic(h_t)
 
-        return action_dist, value_estimate, (h_t, c_t)
+        return action_logits, value_estimate, (h_t, c_t)
         
     def pick_action(self, action_distribution):
         """action selection by sampling from a multinomial.

@@ -13,7 +13,7 @@ from tqdm import tqdm
 from datetime import datetime 
 from collections import namedtuple
 
-from Harlow_Simple.harlow import HarlowSimple
+from Harlow_Simple.harlow import Harlow_1D
 from models.a3c_lstm_simple import A3C_LSTM, A3C_DND_LSTM
 
 def ensure_shared_grads(model, shared_model):
@@ -35,7 +35,7 @@ def train(config,
     T.random.manual_seed(config["seed"] + rank)
     device = config["device"]
 
-    env = HarlowSimple()
+    env = Harlow_1D()
     if config["mode"] == "vanilla":
         agent = A3C_LSTM(
             config["task"]["input-dim"],
@@ -189,7 +189,7 @@ def train_episodic(config,
     T.random.manual_seed(config["seed"] + rank)
     device = config["device"]
 
-    env = HarlowSimple()
+    env = Harlow_1D()
     if config["mode"] == "vanilla":
         agent = A3C_LSTM(
             config["task"]["input-dim"],

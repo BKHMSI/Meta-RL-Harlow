@@ -14,6 +14,7 @@ from collections import namedtuple
 
 from common.shared_optim import SharedAdam, SharedRMSprop
 from Harlow_Simple.train import train, train_episodic
+from Harlow_Simple_Episodic import train as train_ep_1d
 from models.a3c_lstm_simple import A3C_LSTM, A3C_DND_LSTM
 
    
@@ -86,7 +87,9 @@ if __name__ == "__main__":
             print(f"> Loading Checkpoint {filepath}")
             shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
-        train_target = train_episodic if config["mode"] == "episodic" else train 
+        train_target = train_episodic if config["mode"] == "vanilla-episodic" \
+            else train_ep_1d if config["mode"] == "episodic" else train 
+
         for rank in range(config["agent"]["n-workers"]):
             p = mp.Process(target=train_target, args=(
                 config,
