@@ -122,7 +122,7 @@ if __name__ == "__main__":
                 f"{config['load-title']}_{config['start-episode']}.pt"
             )
             print(f"> Loading Checkpoint {filepath}")
-            shared_model.load_state_dict(T.load(filepath)["state_dict"])
+            shared_model.load_state_dict(T.load(filepath, map_location=T.device(config["device"]))["state_dict"])
 
         train_target = train_stacked if "stacked" in config["mode"] else train
         for rank in range(config["agent"]["n-workers"]):

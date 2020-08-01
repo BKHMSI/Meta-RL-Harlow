@@ -43,8 +43,8 @@ class HarlowWrapper:
     if reward in [-5, 5]:
       self.trial_num += 1
     
-    if reward == 0:
-      reward = -0.01
+    # if reward == 0:
+    #   reward = -0.01
     # elif reward == -5:
     #   reward = 0
 
@@ -81,7 +81,7 @@ class HarlowWrapper:
   def _preprocess(self, obs):
     obs = obs.astype(np.float32)
     obs = obs / 255.0
-    obs = (obs - 0.5) / 0.5
+    # obs = (obs - 0.5) / 0.5
     return np.einsum('ijk->kij', obs)
 
   def _create_action(self, action):
