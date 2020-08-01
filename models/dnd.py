@@ -90,7 +90,7 @@ class DND:
             self.keys.pop(0)
             self.vals.pop(0)
 
-    def get_memory(self, query_key):
+    def get_memory(self, query_key, threshold=-1):
         """Perform a 1-NN search over dnd
 
         Parameters
@@ -111,10 +111,10 @@ class DND:
         # compute similarity(query, memory_i ), for all i
         similarities = compute_similarities(query_key, self.keys, self.kernel)
         # get the best-match memory
-        best_memory_val = self._get_memory(similarities)
-        return best_memory_val.unsqueeze(0)
+        best_memory_val = self._get_memory(similarities, threshold)
+        return best_memory_val
 
-    def _get_memory(self, similarities, policy='1NN'):
+    def _get_memory(self, similarities, threshold, policy='1NN'):
         """get the episodic memory according to some policy
         e.g. if the policy is 1nn, return the best matching memory
         e.g. the policy can be based on the rational model
@@ -135,7 +135,10 @@ class DND:
         best_memory_val = None
         if policy is '1NN':
             best_memory_id = T.argmax(similarities)
-            best_memory_val = self.vals[best_memory_id]
+            if threshold <= 0 or similarities[best_memory_id] > threshold:
+                best_memory_val = self.vals[best_memory_id].unsqueeze(0)
+            else:
+                best_memory_val = _empty_memory(self.memory_dim)
         else:
             raise ValueError(f'unrecog recall policy: {policy}')
         return best_memory_val
