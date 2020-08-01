@@ -13,8 +13,8 @@ from tqdm import tqdm
 from collections import namedtuple
 
 from common.shared_optim import SharedAdam, SharedRMSprop
-from Harlow_Simple.train import train, train_episodic
-from Harlow_Simple_Episodic import train as train_ep_1d
+from Harlow_Simple.train import train
+from Harlow_Simple_Episodic.train import train_episodic
 from models.a3c_lstm_simple import A3C_LSTM, A3C_DND_LSTM
 
    
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     os.environ['OMP_NUM_THREADS'] = '1'
 
     parser = argparse.ArgumentParser(description='Paramaters')
-    parser.add_argument('-c', '--config',  type=str, default="Harlow_Simple/config.yaml", help='path of config file')
+    parser.add_argument('-c', '--config',  type=str, default="Harlow_Simple_Episodic/config.yaml", help='path of config file')
     args = parser.parse_args()
 
     with open(args.config, 'r', encoding="utf-8") as fin:
@@ -60,7 +60,8 @@ if __name__ == "__main__":
                 config["agent"]["mem-units"], 
                 config["task"]["num-actions"],
                 config["agent"]["dict-len"],
-                config["agent"]["dict-kernel"]
+                config["agent"]["dict-kernel"],
+                device=config["device"]
             )
         else:
             raise ValueError(config["mode"])
@@ -88,7 +89,7 @@ if __name__ == "__main__":
             shared_model.load_state_dict(T.load(filepath)["state_dict"])
 
         train_target = train_episodic if config["mode"] == "vanilla-episodic" \
-            else train_ep_1d if config["mode"] == "episodic" else train 
+            else train_episodic if config["mode"] == "episodic" else train 
 
         for rank in range(config["agent"]["n-workers"]):
             p = mp.Process(target=train_target, args=(

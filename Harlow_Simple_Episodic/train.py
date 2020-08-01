@@ -24,7 +24,7 @@ def ensure_shared_grads(model, shared_model):
         shared_param._grad = param.grad
         
 
-def train(config, 
+def train_episodic(config, 
     shared_model, 
     optimizer, 
     rank
@@ -41,6 +41,9 @@ def train(config,
             config["task"]["input-dim"],
             config["agent"]["mem-units"], 
             config["task"]["num-actions"],
+            config["agent"]["dict-len"],
+            config["agent"]["dict-kernel"],
+            device=config["device"]
         )
     else:
         raise ValueError(config["mode"])
@@ -61,7 +64,7 @@ def train(config,
 
     done = True 
     state = env.reset()
-    cue = env.generate_uncue()
+    cue = T.tensor(env.generate_uncue())
     p_action, p_reward = [0,0,0], 0
 
     print('='*50)
@@ -72,14 +75,17 @@ def train(config,
     update_counter = 0
     total_rewards = []
 
+    agent.turn_off_retrieval()
+    agent.turn_off_encoding()
+
     while True:
 
-        if env.stage == 0:
-            agent.turn_off_retrieval()
-            agent.turn_on_encoding()
-        else:
-            agent.turn_on_retrieval()
-            agent.turn_off_encoding()
+        # if env.stage == 0:
+        #     agent.turn_off_retrieval()
+        #     agent.turn_on_encoding()
+        # else:
+        #     agent.turn_on_retrieval()
+        #     agent.turn_off_encoding()
 
         agent.load_state_dict(shared_model.state_dict())
         if done:
@@ -114,9 +120,10 @@ def train(config,
             state, reward, done, _ = env.step(int(action))
 
             if abs(reward) == env.obj_reward and env.stage == 0:
-                agent.save_memory(env.context, ct)
+                agent.save_memory(T.tensor(env.context), ct)
             
             cue = env.context if reward == env.fix_reward and env.stage == 1 else env.generate_uncue()
+            cue = T.tensor(cue)
 
             episode_reward += reward
 
@@ -150,7 +157,7 @@ def train(config,
                 T.tensor([state]).float().to(device), (
                 T.tensor([p_action]).float().to(device), 
                 T.tensor([[p_reward]]).float().to(device)), 
-                (ht, ct)
+                (ht, ct), cue
             )
             R = value.detach()
         

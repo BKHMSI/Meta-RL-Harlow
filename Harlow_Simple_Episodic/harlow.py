@@ -26,8 +26,8 @@ class HarlowEpisodic_1D:
         self.max_length = 250
         self.n_trials   = 6
         self.n_actions  = 3 
-        self.n_objects  = 1000
-        self.n_episodes = 2500
+        self.n_objects  = 500
+        self.n_episodes = 5000
         self.state_len  = 17 # size of state
         self.obs_length = 8  # size of receptive field
         self.obj_offset = 3  
@@ -166,7 +166,7 @@ class HarlowEpisodic_1D:
         )
 
         self.reward_obj  = np.random.rand() < 0.5
-        ctx_idx = self.context_pool[self.obj_1] if self.reward_obj else self.context_pool[self.obj_2]
+        ctx_idx = self.context_pool[self.obj_1-2] if self.reward_obj else self.context_pool[self.obj_2-2]
         self.context = _int2binary(ctx_idx, self.ctx_length)  
 
         self.obj_1 /= self.n_objects

@@ -1,9 +1,9 @@
-run-title: HSE_1
+run-title: HSEPS_6
 load-title: HarlowSimple_3_1
 seed: 1234
-device: cpu
+device: cuda
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
-log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_ep_2
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_eps_2
 load-path: ckpt/HarlowSimple_11_1/HarlowSimple_11_1_0_5000.pt
 save-interval: 500
 resume: false
@@ -28,7 +28,7 @@ agent:
   dict-len: 10_000
   dict-kernel: cosine
 
-  n-workers: 1
+  n-workers: 3
   share-optim: true
   
   value-loss-weight: 0.4

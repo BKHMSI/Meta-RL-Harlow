@@ -87,8 +87,6 @@ class A3C_DND_LSTM(nn.Module):
             num_layers=1,
             batch_first=False
         )
-
-        self.working_memory = nn.LSTM(64+4, hidden_dim)
         
         self.actor = nn.Linear(hidden_dim, num_actions)
         self.critic = nn.Linear(hidden_dim, 1)
