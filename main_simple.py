@@ -59,6 +59,7 @@ if __name__ == "__main__":
                 config["task"]["input-dim"],
                 config["agent"]["mem-units"], 
                 config["task"]["num-actions"],
+                config["agent"]["dict-key-dim"],
                 config["agent"]["dict-len"],
                 config["agent"]["dict-kernel"],
                 device=config["device"]

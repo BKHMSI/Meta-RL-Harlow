@@ -7,18 +7,18 @@ if __name__ == "__main__":
     all_rewards = []
 
     base_path = "ckpt"
-    run_title = "HSEPS_5"
+    run_title = "HS_9"
     seeds = [1]
     for seed in seeds:
         run = run_title + f"_{seed}"
-        path = os.path.join(base_path, run, "0_rewards.npy")
+        path = os.path.join(base_path, run, "rewards_0.npy")
         if os.path.exists(path):
             rewards = np.load(path)
-            all_rewards += [rewards[:5000]]
+            all_rewards += [rewards[:3000]]
 
     all_rewards = np.stack(all_rewards)
 
-    quantiles = [0, 1000, 2000, 3000, 4000, 5000]
+    quantiles = [0, 500, 1000, 1500, 2000, 2500, 3000]
     n_quantiles = len(quantiles)-1
     n_trials = all_rewards.shape[2]
     for i in range(n_quantiles):
@@ -34,6 +34,6 @@ if __name__ == "__main__":
     plt.plot([1,6], [50,50], '--')
     plt.xlabel("Trial")
     plt.ylabel("Performance (%)")
-    plt.legend(["Random", "1st", "2nd", "3rd", "4th", "Final"], title="Training Quantile")
-    plt.title("Harlow Task (Simple Episodic)")
+    plt.legend(["Random", "1st", "2nd", "3rd", "4th", "5th", "Final"], title="Training Quantile")
+    plt.title("Harlow Task (Simple)")
     plt.show()

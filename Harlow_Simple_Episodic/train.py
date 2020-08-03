@@ -41,6 +41,7 @@ def train_episodic(config,
             config["task"]["input-dim"],
             config["agent"]["mem-units"], 
             config["task"]["num-actions"],
+            config["agent"]["dict-key-dim"],
             config["agent"]["dict-len"],
             config["agent"]["dict-kernel"],
             device=config["device"]
@@ -75,21 +76,20 @@ def train_episodic(config,
     update_counter = 0
     total_rewards = []
 
-    agent.turn_off_retrieval()
+    # agent.turn_off_retrieval()
+    # agent.turn_on_encoding()
+
     agent.turn_off_encoding()
+    agent.turn_off_retrieval()
 
     while True:
 
-        # if env.stage == 0:
-        #     agent.turn_off_retrieval()
-        #     agent.turn_on_encoding()
-        # else:
+        # if env.stage == 1:
         #     agent.turn_on_retrieval()
-        #     agent.turn_off_encoding()
 
         agent.load_state_dict(shared_model.state_dict())
         if done:
-            ht, ct = agent.get_init_states(device)
+            ht, ct = agent.get_init_states()
         else:
             ht, ct = ht.detach(), ct.detach()
 
@@ -119,7 +119,7 @@ def train_episodic(config,
 
             state, reward, done, _ = env.step(int(action))
 
-            if abs(reward) == env.obj_reward and env.stage == 0:
+            if abs(reward) == env.obj_reward:
                 agent.save_memory(T.tensor(env.context), ct)
             
             cue = env.context if reward == env.fix_reward and env.stage == 1 else env.generate_uncue()
@@ -190,5 +190,5 @@ def train_episodic(config,
         writer.add_scalar("losses/total_loss", loss.item(), update_counter)
 
         if env.episode_num > env.n_episodes:
-            np.save(os.path.join(os.path.dirname(save_path), f"{rank}_rewards.npy"), env.reward_counter)
+            np.save(os.path.join(os.path.dirname(save_path), f"rewards_{rank}.npy"), env.reward_counter)
             break  

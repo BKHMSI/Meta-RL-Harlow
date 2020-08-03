@@ -27,7 +27,7 @@ class HarlowEpisodic_1D:
         self.n_trials   = 6
         self.n_actions  = 3 
         self.n_objects  = 500
-        self.n_episodes = 5000
+        self.n_episodes = 3000
         self.state_len  = 17 # size of state
         self.obs_length = 8  # size of receptive field
         self.obj_offset = 3  
@@ -38,6 +38,7 @@ class HarlowEpisodic_1D:
         self.ctx_length = int(np.ceil(np.log2(self.n_objects)))
         self._generate_contexts()
 
+        self.memory = []
         self.episode_num = 0
         self.verbose = verbose 
         self.visualize = visualize
@@ -159,13 +160,21 @@ class HarlowEpisodic_1D:
             print(f"Pointer: {self.pointer}")
 
         # episode objects
-        self.obj_1, self.obj_2 = np.random.randint(
-            low=2, 
-            high=self.n_objects+2, 
-            size=2
-        )
+        if self.stage == 0:
+            self.obj_1, self.obj_2 = np.random.randint(
+                low=2, 
+                high=self.n_objects+2, 
+                size=2
+            )
+            self.reward_obj  = np.random.rand() < 0.5
+            self.memory += [self.obj_1 if self.reward_obj else self.obj_2]
+        else:
+            self.obj_1 = np.random.choice(self.memory)
+            self.obj_2 = np.random.choice(list(np.arange(2, self.obj_1)) 
+                                        + list(np.arange(self.obj_1+1,self.n_objects+2)))
+            self.reward_obj = True 
 
-        self.reward_obj  = np.random.rand() < 0.5
+        
         ctx_idx = self.context_pool[self.obj_1-2] if self.reward_obj else self.context_pool[self.obj_2-2]
         self.context = _int2binary(ctx_idx, self.ctx_length)  
 

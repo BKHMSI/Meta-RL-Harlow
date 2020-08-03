@@ -34,10 +34,11 @@ class DND:
 
     """
 
-    def __init__(self, dict_len, memory_dim, kernel='l2'):
+    def __init__(self, dict_len, key_dim, memory_dim, kernel='l2'):
         # params
         self.dict_len = dict_len
         self.kernel = kernel
+        self.key_dim = key_dim
         self.memory_dim = memory_dim
         # dynamic state
         self.encoding_off = False
@@ -48,8 +49,10 @@ class DND:
         self.check_config()
 
     def reset_memory(self):
-        self.keys = []
-        self.vals = []
+        self.pointer = 0
+        self.overflow = False 
+        self.keys = T.empty(self.dict_len, self.key_dim)
+        self.vals = T.empty(self.dict_len, self.memory_dim)
 
     def check_config(self):
         assert self.dict_len > 0
@@ -69,7 +72,12 @@ class DND:
         for k, v in zip(input_keys, input_vals):
             self.save_memory(k, v)
 
-    def save_memory(self, memory_key, memory_val):
+    def save_memory(self, 
+        memory_key, 
+        memory_val, 
+        replace_similar=False,
+        threshold=0
+    ):
         """Save an episodic memory to the dictionary
 
         Parameters
@@ -83,12 +91,24 @@ class DND:
             return
         # add new memory to the the dictionary
         # get data is necessary for gradient reason
-        self.keys.append(T.squeeze(memory_key.data))
-        self.vals.append(T.squeeze(memory_val.data))
-        # remove the oldest memory, if overflow
-        if len(self.keys) > self.dict_len:
-            self.keys.pop(0)
-            self.vals.pop(0)
+
+        replaced = False 
+        if replace_similar and (self.pointer > 0 or self.overflow):
+            similarities = compute_similarities(memory_key, self.keys[:self.pointer], self.kernel)
+            closest_idx = T.argmax(similarities)
+            if similarities[closest_idx] > threshold:
+                self.keys[closest_idx] = T.squeeze(memory_key.data)
+                self.vals[closest_idx] = T.squeeze(memory_val.data)
+                replaced = True 
+
+        if not replace_similar or not replaced:        
+            self.keys[self.pointer] = T.squeeze(memory_key.data) 
+            self.vals[self.pointer] = T.squeeze(memory_val.data) 
+            self.pointer += 1
+            if self.pointer >= self.dict_len:
+                self.pointer = 0
+                self.overflow = True 
+
 
     def get_memory(self, query_key, threshold=-1):
         """Perform a 1-NN search over dnd
@@ -105,11 +125,10 @@ class DND:
 
         """
         # if no memory, return the zero vector
-        n_memories = len(self.keys)
-        if n_memories == 0 or self.retrieval_off:
+        if (self.pointer == 0 and not self.overflow) or self.retrieval_off:
             return _empty_memory(self.memory_dim)
         # compute similarity(query, memory_i ), for all i
-        similarities = compute_similarities(query_key, self.keys, self.kernel)
+        similarities = compute_similarities(query_key, self.keys[:self.pointer], self.kernel)
         # get the best-match memory
         best_memory_val = self._get_memory(similarities, threshold)
         return best_memory_val
@@ -167,15 +186,13 @@ def compute_similarities(query_key, key_list, metric):
     """
     # reshape query to 1 x key_dim
     q = query_key.data.view(1, -1)
-    # reshape memory keys to #keys x key_dim
-    M = T.stack(key_list)
     # compute similarities
     if metric == 'cosine':
-        similarities = F.cosine_similarity(q.float(), M.float())
+        similarities = F.cosine_similarity(q.float(), key_list.float())
     elif metric == 'l1':
-        similarities = - F.pairwise_distance(q, M, p=1)
+        similarities = - F.pairwise_distance(q, key_list, p=1)
     elif metric == 'l2':
-        similarities = - F.pairwise_distance(q, M, p=2)
+        similarities = - F.pairwise_distance(q, key_list, p=2)
     else:
         raise ValueError(f'unrecog metric: {metric}')
     return similarities

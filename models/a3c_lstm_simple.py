@@ -59,6 +59,7 @@ class A3C_DND_LSTM(nn.Module):
             input_dim, 
             hidden_dim, 
             num_actions,
+            dict_key_dim,
             dict_len,
             kernel='l2', 
             bias=True,
@@ -78,7 +79,7 @@ class A3C_DND_LSTM(nn.Module):
         )
 
         # long-term memory 
-        self.dnd = DND(dict_len, hidden_dim, kernel)
+        self.dnd = DND(dict_len, dict_key_dim, hidden_dim, kernel)
 
         # short-term memory
         self.ep_lstm = EpLSTM(
@@ -121,9 +122,9 @@ class A3C_DND_LSTM(nn.Module):
 
         return action_logits, value_estimate, (h_t, c_t), feats
 
-    def get_init_states(self, device="cpu"):
-        h0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(device)
-        c0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(device)
+    def get_init_states(self):
+        h0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(self.device)
+        c0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(self.device)
         return (h0, c0)
 
     def turn_off_encoding(self):
@@ -142,7 +143,7 @@ class A3C_DND_LSTM(nn.Module):
         self.dnd.reset_memory()
 
     def save_memory(self, mem_key, mem_val):
-        self.dnd.save_memory(mem_key, mem_val)
+        self.dnd.save_memory(mem_key, mem_val, replace_similar=True, threshold=0.9)
 
     def retrieve_memory(self, query_key):
         return self.dnd.get_memory(query_key)
