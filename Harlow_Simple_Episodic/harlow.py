@@ -123,6 +123,9 @@ class HarlowEpisodic_1D:
         if self.visualize:
             self._add_frames(obs)
 
+        # if reward == self.fix_reward or reward == -self.obj_reward:
+        #     reward = 0
+
         if self.verbose:
             print(f"Observation: {obs}")
             print(f"Reward: {reward} | Pointer: {self.pointer}")

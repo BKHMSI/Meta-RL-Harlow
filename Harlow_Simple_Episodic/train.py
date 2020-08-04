@@ -76,16 +76,16 @@ def train_episodic(config,
     update_counter = 0
     total_rewards = []
 
-    # agent.turn_off_retrieval()
-    # agent.turn_on_encoding()
-
-    agent.turn_off_encoding()
     agent.turn_off_retrieval()
+    agent.turn_on_encoding()
+
+    # agent.turn_off_encoding()
+    # agent.turn_off_retrieval()
 
     while True:
 
-        # if env.stage == 1:
-        #     agent.turn_on_retrieval()
+        if env.stage == 1:
+            agent.turn_on_retrieval()
 
         agent.load_state_dict(shared_model.state_dict())
         if done:
@@ -99,6 +99,11 @@ def train_episodic(config,
         entropies = []
 
         for _ in range(n_step_update):
+
+            if -1 in cue:
+                agent.turn_off_retrieval()
+            else:
+                agent.turn_on_retrieval()
 
             logit, value, (ht, ct), _ = agent(
                 T.tensor([state]).float().to(device), (

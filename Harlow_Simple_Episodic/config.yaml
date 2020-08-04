@@ -1,9 +1,9 @@
-run-title: HS_9
+run-title: HSE_11
 load-title: HarlowSimple_3_1
 seed: 1234
 device: cuda
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
-log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_eps_9
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_eps_11
 load-path: ckpt/HarlowSimple_11_1/HarlowSimple_11_1_0_5000.pt
 save-interval: 500
 resume: false
