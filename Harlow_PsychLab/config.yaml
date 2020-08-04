@@ -1,23 +1,24 @@
-run-title: Harlow_29
-load-title: Harlow_28_1
-seed: 1001
+run-title: Harlow_34
+load-title: Harlow_28
+seed: 1234
 device: cpu
 save-path: /home/ubuntu/lab/Meta-RL-Harlow/ckpt
-log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_29
+log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_34
 save-interval: 100
-resume: true
-start-episode: 4800
+resume: false
+start-episode: 0
 optimizer: rmsprop # {rmsprop, adam}
 train: true
 test: true
-mode: vanilla # {vanilla, stacked, conv-vanilla, conv-stacked}
+mode: stacked # {vanilla, stacked, conv-vanilla, conv-stacked}
+desc: 7 actions (3 velocities and no-op)
 
 task:
   imsize: 34
   max-length: 3600
   num-trials: 6
 
-  num-actions: 3
+  num-actions: 7
   action-repeat: 4
   decision-per-trial: 3
 

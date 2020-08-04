@@ -14,7 +14,7 @@ def make_layers(cfg, batch_norm=False, in_channels=3):
     layers = []
     for i, v in enumerate(cfg):
         if v == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            layers += [nn.MaxPool2d(kernel_size=2, stride=4)]
         else:
             padding = v[1] if isinstance(v, tuple) else 1
             out_channels = v[0] if isinstance(v, tuple) else v
@@ -37,8 +37,8 @@ class Encoder(nn.Module):
             2*n_channel, 
             'M', 
             4*n_channel, 
-            # 4*n_channel, 
-            # 'M', 
+            4*n_channel, 
+            'M', 
             # (8*n_channel, 0), 
             # 'M'
         ]
@@ -64,11 +64,11 @@ class A3C_ConvLSTM(nn.Module):
             }
             self.encoder.load_state_dict(pretrained_dict)
 
-        self.last_conv = make_layers(
-            [(2*config["conv-nchannels"], 0), 'M'], 
-            batch_norm=True,
-            in_channels=4*config["conv-nchannels"]
-        )
+        # self.last_conv = make_layers(
+        #     [(2*config["conv-nchannels"], 0), 'M'], 
+        #     batch_norm=True,
+        #     in_channels=4*config["conv-nchannels"]
+        # )
 
         self.actor = nn.Linear(config["mem-units"], num_actions)
         self.critic = nn.Linear(config["mem-units"], 1)
@@ -108,7 +108,7 @@ class A3C_ConvLSTM(nn.Module):
 class A3C_ConvStackedLSTM(nn.Module):
 
     def __init__(self, config, num_actions, pretrained=True):
-        super(A3C_ConvLSTM, self).__init__()
+        super(A3C_ConvStackedLSTM, self).__init__()
     
         self.encoder = Encoder(config["conv-nchannels"])
         if pretrained:
@@ -120,16 +120,10 @@ class A3C_ConvStackedLSTM(nn.Module):
             }
             self.encoder.load_state_dict(pretrained_dict)
 
-        self.last_conv = make_layers(
-            [(2*config["conv-nchannels"], 0), 'M'], 
-            batch_norm=True,
-            in_channels=4*config["conv-nchannels"]
-        )
-
-        self.actor = nn.Linear(64, num_actions)
-        self.critic = nn.Linear(64, 1)
-        self.lstm_1 = nn.LSTM(4096+1, config["mem-units"])
-        self.lstm_2 = nn.LSTM(4096+config["mem-units"]+3, 64)
+        self.actor = nn.Linear(128, num_actions)
+        self.critic = nn.Linear(128, 1)
+        self.lstm_1 = nn.LSTM(2048+1, config["mem-units"])
+        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+3, 128)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
@@ -147,7 +141,7 @@ class A3C_ConvStackedLSTM(nn.Module):
         if state_2 is None:
             state_2 = self.get_init_states(layer=2)
 
-        feats = self.last_conv(self.encoder(obs.unsqueeze(0)))
+        feats = self.encoder(obs)
         feats = feats.view(feats.size(0), -1)
 
         input_1 = T.cat((feats, p_reward), dim=-1)

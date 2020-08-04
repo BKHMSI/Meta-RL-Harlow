@@ -20,7 +20,7 @@ class HarlowWrapper:
     self.save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}.gif")
     self.rank = rank 
     self.frames = []
-    self.num_actions = 3 # {no-op, left, right}
+    self.num_actions = config["task"]["num-actions"] # {no-op, left, right}
     self.episode_num = config["start-episode"]
     self.trial_num = 0
     self.reset()
@@ -43,9 +43,7 @@ class HarlowWrapper:
     if reward in [-5, 5]:
       self.trial_num += 1
     
-    # if reward == 0:
-    #   reward = -0.01
-    # elif reward == -5:
+    # if reward == -5:
     #   reward = 0
 
     reward = reward / 5. 
@@ -88,7 +86,8 @@ class HarlowWrapper:
     """
       action: no-op (0), left (1), right(-1)
     """
-    map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
+    # map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
+    map_actions = [0, 1, -1, 2, -2, 3, -3]
     return np.array([map_actions[action],0,0,0,0,0,0], dtype=np.intc)
 
 if __name__ == "__main__":

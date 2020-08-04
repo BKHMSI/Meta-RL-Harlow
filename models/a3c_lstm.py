@@ -69,7 +69,7 @@ class A3C_StackedLSTM(nn.Module):
         self.actor = nn.Linear(128, num_actions)
         self.critic = nn.Linear(128, 1)
         self.lstm_1 = nn.LSTM(256+1, config["mem-units"])
-        self.lstm_2 = nn.LSTM(256+config["mem-units"]+3, 128)
+        self.lstm_2 = nn.LSTM(256+config["mem-units"]+num_actions, 128)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
