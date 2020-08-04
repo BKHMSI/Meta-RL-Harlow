@@ -198,7 +198,7 @@ def train_stacked(config,
     env = HarlowWrapper(lab_env, config, rank)
     
     if config["mode"] == "conv-stacked":
-        agent = A3C_ConvLSTM(config["agent"], env.num_actions)
+        agent = A3C_ConvStackedLSTM(config["agent"], env.num_actions)
     elif config["mode"] == "stacked":
         agent = A3C_StackedLSTM(config["agent"], env.num_actions)
     else:
@@ -220,7 +220,7 @@ def train_stacked(config,
 
     done = True 
     state = env.reset()
-    p_action, p_reward = [0,0,0], 0
+    p_action, p_reward = [0]*config["task"]["num-actions"], 0
 
     print('='*50)
     print(f"Starting Trainer {rank}")
