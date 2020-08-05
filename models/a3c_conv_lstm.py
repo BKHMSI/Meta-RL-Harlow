@@ -123,7 +123,7 @@ class A3C_ConvStackedLSTM(nn.Module):
         self.actor = nn.Linear(128, num_actions)
         self.critic = nn.Linear(128, 1)
         self.lstm_1 = nn.LSTM(2048+1, config["mem-units"])
-        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+3, 128)
+        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+num_actions, 128)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)

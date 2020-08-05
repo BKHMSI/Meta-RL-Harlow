@@ -16,6 +16,7 @@ class HarlowWrapper:
     self.env = env
     self.max_length = config["task"]["max-length"]
     self.num_trials = config["task"]["num-trials"]
+    self.reward_scheme = config["task"]["reward-scheme"]
     self.save_interval = config["save-interval"]
     self.save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}.gif")
     self.rank = rank 
@@ -42,11 +43,8 @@ class HarlowWrapper:
 
     if reward in [-5, 5]:
       self.trial_num += 1
-    
-    # if reward == -5:
-    #   reward = 0
 
-    reward = reward / 5. 
+    reward = self._return_reward(reward) 
 
     timestep = self.num_steps() 
     done = not self.env.is_running() or timestep > self.max_length or self.trial_num >= self.num_trials
@@ -81,6 +79,18 @@ class HarlowWrapper:
     obs = obs / 255.0
     # obs = (obs - 0.5) / 0.5
     return np.einsum('ijk->kij', obs)
+
+  def _return_reward(self, reward):
+    if self.reward_scheme == 0:
+      return reward / 5.
+    elif self.reward_scheme == 1:
+      if reward in [-5, 1]: reward == 0
+      return reward / 5.
+    elif self.reward_scheme == 2:
+      if reward == -5: reward == 0
+      return reward / 5.
+    else:
+      return reward
 
   def _create_action(self, action):
     """

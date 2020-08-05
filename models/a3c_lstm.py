@@ -11,18 +11,16 @@ class A3C_LSTM(nn.Module):
         super(A3C_LSTM, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=(8, 8), stride=(4, 4)),  # output: (16, 20, 20)
-            nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)), # output: (32, 9, 9)
+            nn.Conv2d(3, 16, kernel_size=(8, 8), stride=(4, 4)),  
+            nn.Conv2d(16, 32, kernel_size=(4, 4), stride=(2, 2)),
             nn.Flatten(),
-            # nn.Linear(32*9*9, 256),
-            # nn.Linear(6272, 256),
             nn.Linear(7200, 256),
             nn.ReLU()
         )
         
         self.actor = nn.Linear(config["mem-units"], num_actions)
         self.critic = nn.Linear(config["mem-units"], 1)
-        self.working_memory = nn.LSTM(256+4, config["mem-units"])
+        self.working_memory = nn.LSTM(256+num_actions+1, config["mem-units"])
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)

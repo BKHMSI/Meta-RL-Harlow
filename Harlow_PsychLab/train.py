@@ -26,14 +26,12 @@ def ensure_shared_grads(model, shared_model):
             return
         shared_param._grad = param.grad
         
-
 def train(config, 
     shared_model, 
     optimizer, 
     rank, 
-    lock, 
+    task_config,
     counter,
-    task_config
 ):
 
     T.manual_seed(config["seed"] + rank)
@@ -67,7 +65,7 @@ def train(config,
 
     done = True 
     state = env.reset()
-    p_action, p_reward = [0,0,0], 0
+    p_action, p_reward = [0]*config["task"]["num-actions"], 0
 
     print('='*50)
     print(f"Starting Trainer {rank}")
@@ -179,14 +177,12 @@ def train(config,
         update_counter += 1
         writer.add_scalar("losses/total_loss", loss.item(), update_counter)
 
-
 def train_stacked(config, 
     shared_model, 
     optimizer, 
     rank, 
-    lock, 
+    task_config,
     counter,
-    task_config
 ):
 
     T.manual_seed(config["seed"] + rank)

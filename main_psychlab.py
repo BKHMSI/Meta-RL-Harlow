@@ -108,9 +108,8 @@ if __name__ == "__main__":
         optimizer.share_memory()
    
         processes = []
-        counter = mp.Value('i', 0)
-        lock = mp.Lock()
-        
+        update_counter = 0
+
         T.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         T.random.manual_seed(config["seed"])
@@ -119,10 +118,18 @@ if __name__ == "__main__":
             filepath = os.path.join(
                 config["save-path"], 
                 config["load-title"], 
-                f"{config['load-title']}_{config['start-episode']}.pt"
+                f"{config['load-title']}_{config['start-episode']:04d}.pt"
             )
             print(f"> Loading Checkpoint {filepath}")
-            shared_model.load_state_dict(T.load(filepath, map_location=T.device(config["device"]))["state_dict"])
+            model_data = T.load(filepath, map_location=T.device(config["device"]))
+            update_counter = model_data["update_counter"]
+            pretrained_dict = model_data["state_dict"]
+
+            # load_dict = {}
+            # for i, (k, v) in enumerate(pretrained_dict.items()):
+            #     load_dict[k] = v if i < 6 else eval(f"shared_model.{k}")
+ 
+            shared_model.load_state_dict(pretrained_dict)
 
         train_target = train_stacked if "stacked" in config["mode"] else train
         for rank in range(config["agent"]["n-workers"]):
@@ -131,9 +138,8 @@ if __name__ == "__main__":
                 shared_model,
                 optimizer,
                 rank,
-                lock,
-                counter,
-                task_config
+                task_config,
+                update_counter,
             ))
             p.start()
             processes += [p]

@@ -1,5 +1,5 @@
 run-title: Harlow_34
-load-title: Harlow_28
+load-title: Harlow_29
 seed: 1234
 device: cpu
 save-path: /home/ubuntu/lab/Meta-RL-Harlow/ckpt
@@ -17,6 +17,8 @@ task:
   imsize: 34
   max-length: 3600
   num-trials: 6
+
+  reward-scheme: 0 # {0, 1, 2}
 
   num-actions: 7
   action-repeat: 4
