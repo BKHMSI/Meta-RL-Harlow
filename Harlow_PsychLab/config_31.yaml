@@ -1,0 +1,39 @@
+agent:
+  conv-nchannels: 128
+  dict-kernel: cosine
+  dict-len: 100000
+  entropy-weight: 0.001
+  gae-lambda: 1.0
+  gamma: 0.91
+  lr: 0.00075
+  max-grad-norm: 0.0
+  mem-units: 256
+  n-step-update: 100
+  n-workers: 32
+  share-optim: true
+  value-loss-weight: 0.4
+  weight-decay: 0
+desc: only reward of 1, relu after convs
+device: cpu
+load-title: Harlow_31_1
+log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_31_1
+mode: stacked
+optimizer: rmsprop
+resume: true
+run-title: Harlow_31_1
+save-interval: 100
+save-path: /home/ubuntu/lab/Meta-RL-Harlow/ckpt
+seed: 101
+start-episode: 400
+task:
+  reward-scheme: 1
+  action-repeat: 4
+  decision-per-trial: 3
+  imsize: 34
+  max-length: 3600
+  num-actions: 3
+  num-trials: 6
+  test-episodes: 500
+  train-episodes: 100000
+test: true
+train: true

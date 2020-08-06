@@ -16,6 +16,7 @@ class HarlowWrapper:
     self.env = env
     self.max_length = config["task"]["max-length"]
     self.num_trials = config["task"]["num-trials"]
+    self.reward_scheme = config["task"]["reward-scheme"]
     self.save_interval = config["save-interval"]
     self.save_path = os.path.join(config["save-path"], config["run-title"], config["run-title"]+"_{epi:04d}.gif")
     self.rank = rank 
@@ -42,11 +43,8 @@ class HarlowWrapper:
 
     if reward in [-5, 5]:
       self.trial_num += 1
-    
-    # if reward == -5 or reward == 1:
-    #   reward = 0
 
-    reward = reward / 5. 
+    reward = self._return_reward(reward) 
 
     timestep = self.num_steps() 
     done = not self.env.is_running() or timestep > self.max_length or self.trial_num >= self.num_trials
@@ -85,6 +83,18 @@ class HarlowWrapper:
     obs = (obs - 0.5) / 0.5
     return np.einsum('ijk->kij', obs)
 
+  def _return_reward(self, reward):
+    if self.reward_scheme == 0:
+      return reward / 5.
+    elif self.reward_scheme == 1:
+      if reward in [-5, 1]: reward == 0
+      return reward / 5.
+    elif self.reward_scheme == 2:
+      if reward == -5: reward == 0
+      return reward / 5.
+    else:
+      return reward
+
   def _create_action(self, action):
     """
       action: no-op (0), left (1), right(-1)
@@ -92,29 +102,3 @@ class HarlowWrapper:
     # map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
     map_actions = [0, 2, -2, 2, -2, 3, -3]
     return np.array([map_actions[action],0,0,0,0,0,0], dtype=np.intc)
-
-if __name__ == "__main__":
-  import deepmind_lab as lab 
-
-  task_config = {
-        'fps': "60",
-        'width': "128",
-        'height': "128"
-  }
-
-  config = {
-    "run-title": "harlow-env-test",
-    "save-path": "./",
-    "start-episode": 0,
-    "task": {
-      "max-length": 3600,
-      "num-trials": 6
-    }
-  }
-
-  lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
-  env = HarlowWrapper(lab_env, config, 0)
-
-  obs = env.env.observations()['RGB_INTERLEAVED']
-  filepath = os.path.join(config["save-path"], config["run-title"] + ".png")
-  imageio.imsave(filepath, obs)

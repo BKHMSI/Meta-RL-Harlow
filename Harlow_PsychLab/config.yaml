@@ -18,6 +18,8 @@ task:
   max-length: 3600
   num-trials: 6
 
+  reward-scheme: 0 # {0, 1, 2}
+
   num-actions: 5
   action-repeat: 4
   decision-per-trial: 3
