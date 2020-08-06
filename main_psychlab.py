@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Paramaters')
     parser.add_argument('-c', '--config',  type=str, 
-                        default="/home/ubuntu/lab/Meta-RL-Harlow/Harlow_PsychLab/config.yaml", 
+                        default="/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/Harlow_PsychLab/config.yaml", 
                         help='path of config file')
     parser.add_argument('--length', type=int, default=3600,
                         help='Number of steps to run the agent')

@@ -8,11 +8,25 @@ In this repository, I reproduce the results of [Prefrontal Cortex as a Meta-Rein
 
 <table align="center" width="100%">
     <tr>
-        <th>Harlow PsychLab (still not working)</th>
+        <th colspan="5">Harlow PsychLab (still not working)</th>
         <th>Harlow Simple</th>
     </tr>
     <tr>
-        <td align="center" width="75%"><img alt="PsychLab Demo" src="assets/Harlow_25_1_0300.gif"></td>
+        <td align="center" width="15%">
+            <img alt="PsychLab Demo" src="assets/Harlow_25_0300.gif">
+        </td>
+        <td align="center" width="15%">
+            <img alt="PsychLab Demo" src="assets/Harlow_38_5700.gif">
+        </td>
+        <td align="center" width="15%">
+            <img alt="PsychLab Demo" src="assets/Harlow_38_17900.gif">
+        </td>
+        <td align="center" width="15%">
+            <img alt="PsychLab Demo" src="assets/Harlow_38_18000.gif">
+        </td>
+        <td align="center" width="15%">
+            <img alt="PsychLab Demo" src="assets/Harlow_38_20000.gif">
+        </td>
         <td align="center" width="25%"><img alt="Simple Demo" src="assets/harlow_simple.gif"></td>
     </tr>
 </table>

@@ -7,7 +7,7 @@ if __name__ == "__main__":
     all_rewards = []
 
     base_path = "ckpt"
-    run_title = "HS_9"
+    run_title = "HSEPS_9"
     seeds = [1]
     for seed in seeds:
         run = run_title + f"_{seed}"
@@ -35,5 +35,5 @@ if __name__ == "__main__":
     plt.xlabel("Trial")
     plt.ylabel("Performance (%)")
     plt.legend(["Random", "1st", "2nd", "3rd", "4th", "5th", "Final"], title="Training Quantile")
-    plt.title("Harlow Task (Simple)")
+    plt.title("Harlow Task (Episodic Simple)")
     plt.show()

@@ -1,24 +1,24 @@
-run-title: Harlow_34
-load-title: Harlow_28
+run-title: Harlow_38
+load-title: Harlow_38_1
 seed: 1234
-device: cpu
-save-path: /home/ubuntu/lab/Meta-RL-Harlow/ckpt
-log-path: /home/ubuntu/lab/Meta-RL-Harlow/logs_34
+device: cuda
+save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs/logs_38
 save-interval: 100
-resume: false
-start-episode: 0
+resume: true
+start-episode: 20000
 optimizer: rmsprop # {rmsprop, adam}
 train: true
 test: true
-mode: stacked # {vanilla, stacked, conv-vanilla, conv-stacked}
-desc: 7 actions (3 velocities and no-op)
+mode: conv-stacked # {vanilla, stacked, conv-vanilla, conv-stacked}
+desc: 5 actions (2 velocities and no-op)
 
 task:
   imsize: 34
   max-length: 3600
   num-trials: 6
 
-  num-actions: 7
+  num-actions: 5
   action-repeat: 4
   decision-per-trial: 3
 
@@ -32,7 +32,7 @@ agent:
   dict-len: 100_000
   dict-kernel: cosine
 
-  n-workers: 32
+  n-workers: 1
   share-optim: true
   
   value-loss-weight: 0.4

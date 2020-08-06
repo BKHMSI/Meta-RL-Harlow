@@ -43,7 +43,7 @@ class HarlowWrapper:
     if reward in [-5, 5]:
       self.trial_num += 1
     
-    # if reward == -5:
+    # if reward == -5 or reward == 1:
     #   reward = 0
 
     reward = reward / 5. 
@@ -76,10 +76,13 @@ class HarlowWrapper:
     filepath = os.path.join(os.path.dirname(self.save_path), "snapshot.png")
     imageio.imsave(filepath, obs)
 
+  def save_frames(self, path):
+      imageio.mimsave(path, self.frames)
+
   def _preprocess(self, obs):
     obs = obs.astype(np.float32)
     obs = obs / 255.0
-    # obs = (obs - 0.5) / 0.5
+    obs = (obs - 0.5) / 0.5
     return np.einsum('ijk->kij', obs)
 
   def _create_action(self, action):
@@ -87,7 +90,7 @@ class HarlowWrapper:
       action: no-op (0), left (1), right(-1)
     """
     # map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
-    map_actions = [0, 1, -1, 2, -2, 3, -3]
+    map_actions = [0, 2, -2, 2, -2, 3, -3]
     return np.array([map_actions[action],0,0,0,0,0,0], dtype=np.intc)
 
 if __name__ == "__main__":
