@@ -2,6 +2,7 @@ logs*
 *ckpt*
 samples
 archive
+featmaps
 
 pretrain/logs
 pretrain/data

@@ -20,6 +20,7 @@ from Harlow_PsychLab.train import train, train_stacked
 from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 from models.a3c_conv_lstm import A3C_ConvLSTM, A3C_ConvStackedLSTM
+from models.densenet_lstm import DenseNet_StackedLSTM
 
    
 if __name__ == "__main__":
@@ -92,38 +93,61 @@ if __name__ == "__main__":
         ############## Start Here ##############
         print(f"> Running {config['run-title']} {config['mode']} using {config['optimizer']}")
 
-        if config["mode"] == "conv-stacked":
-            agent = A3C_ConvStackedLSTM(config["agent"], config["task"]["num-actions"])
+        params = (config["agent"], config["task"]["num-actions"])
+        if config["mode"] == "densenet-stacked":
+            agent = DenseNet_StackedLSTM(*params)
+        elif config["mode"] == "conv-stacked":
+            agent = A3C_ConvStackedLSTM(*params)
         elif config["mode"] == "stacked":
-            agent = A3C_StackedLSTM(config["agent"], config["task"]["num-actions"])
+            agent = A3C_StackedLSTM(*params)
         elif config["mode"] == "conv-vanilla":
-            agent = A3C_ConvLSTM(config["agent"], config["task"]["num-actions"])
+            agent = A3C_ConvLSTM(*params)
         elif config["mode"] == "vanilla":
-            agent = A3C_LSTM(config["agent"], config["task"]["num-actions"])
+            agent = A3C_LSTM(*params)
         else:
             raise ValueError(config["mode"])
         
         print(agent)
         agent.to(config['device'])
 
-        optimizer = T.optim.RMSprop(agent.parameters(), lr=config["agent"]["lr"])
+        optim_class = T.optim.RMSprop if config["optimizer"] == "rmsprop" else T.optim.AdamW
+        optimizer = optim_class(agent.parameters(), lr=config["agent"]["lr"])
         
         T.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         T.random.manual_seed(config["seed"])
         update_counter = 0
 
-        if config["resume"]:
+        if config["copy-encoder"]:
             filepath = os.path.join(
                 config["save-path"], 
                 config["load-title"], 
                 f"{config['load-title']}_{config['start-episode']}.pt"
+            )
+            print(f"> Copying Encoder from {filepath}")
+            pretrained_dict = T.load(filepath, map_location=T.device(config["device"]))["state_dict"]
+            load_dict = {}
+            for k, v in pretrained_dict.items():
+                load_dict[k] = v if "encoder" in k else eval(f"agent.{k}")
+            agent.load_state_dict(load_dict)
+
+
+        if config["resume"]:
+            filepath = os.path.join(
+                config["save-path"], 
+                config["load-title"], 
+                f"{config['load-title']}_{config['start-episode']:04d}.pt"
             )
             print(f"> Loading Checkpoint {filepath}")
             model_data = T.load(filepath, map_location=T.device(config["device"]))
             update_counter = model_data["update_counter"]
             agent.load_state_dict(model_data["state_dict"])
         
+        if config["freeze-encoder"]:
+            print("> Freezing Encoder")
+            for param in agent.encoder.parameters():
+                param.requires_grad = False
+
         lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
         env = HarlowWrapper(lab_env, config, 0)
         
@@ -208,7 +232,7 @@ if __name__ == "__main__":
                         }, save_path.format(epi=env.episode_num) + ".pt")
 
                     break 
-
+            
             R = T.zeros(1, 1).to(device)
             if not done:
                 _, value, _, _ = agent(

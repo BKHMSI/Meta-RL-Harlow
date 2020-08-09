@@ -132,12 +132,21 @@ if __name__ == "__main__":
 
             state, reward, done, _ = env.step(int(action))
 
+            if reward == 0.2 and config["save-featmaps"]:
+                state, _, _, _ = env.step(0)
+                state, _, _, _ = env.step(1)
+                layer = 9
+                path = f"/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/featmaps_{config['start-episode']:04d}_{layer}.npy"
+                agent.save_featmaps(T.tensor([state]), path, layer)
+                print("> Feature Maps Saved")
+                exit()
+
             episode_reward += reward
 
             p_action = np.eye(env.num_actions)[int(action)]
             p_reward = reward
 
-    env.save_frames("/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/sample_5700_1.gif")
+    env.save_frames(f"/home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/sample_{config['start-episode']:04d}.gif")
     print(f"Episode Reward: {episode_reward}")
     
         

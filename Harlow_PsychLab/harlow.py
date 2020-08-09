@@ -87,10 +87,10 @@ class HarlowWrapper:
     if self.reward_scheme == 0:
       return reward / 5.
     elif self.reward_scheme == 1:
-      if reward in [-5, 1]: reward == 0
+      if reward in [-5, 1]: reward = 0
       return reward / 5.
     elif self.reward_scheme == 2:
-      if reward == -5: reward == 0
+      if reward == -5: reward = 0
       return reward / 5.
     else:
       return reward
@@ -100,5 +100,6 @@ class HarlowWrapper:
       action: no-op (0), left (1), right(-1)
     """
     # map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
-    map_actions = [0, 2, -2, 2, -2, 3, -3]
+    # map_actions = [0, 2, -2, 2, -2, 3, -3]
+    map_actions = [4.4, -4.4]
     return np.array([map_actions[action],0,0,0,0,0,0], dtype=np.intc)

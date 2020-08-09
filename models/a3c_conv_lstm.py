@@ -20,9 +20,9 @@ def make_layers(cfg, batch_norm=False, in_channels=3):
             out_channels = v[0] if isinstance(v, tuple) else v
             conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=padding)
             if batch_norm:
-                layers += [conv2d, nn.BatchNorm2d(out_channels, affine=False), nn.ReLU()]
+                layers += [conv2d, nn.BatchNorm2d(out_channels, affine=False), nn.ELU()] # this was ReLU
             else:
-                layers += [conv2d, nn.ReLU()]
+                layers += [conv2d, nn.ELU()] # this was ReLU
             in_channels = out_channels
     return nn.Sequential(*layers)
 
@@ -120,10 +120,10 @@ class A3C_ConvStackedLSTM(nn.Module):
             }
             self.encoder.load_state_dict(pretrained_dict)
 
-        self.actor = nn.Linear(128, num_actions)
-        self.critic = nn.Linear(128, 1)
+        self.actor = nn.Linear(256, num_actions)
+        self.critic = nn.Linear(256, 1)
         self.lstm_1 = nn.LSTM(2048+1, config["mem-units"])
-        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+num_actions, 128)
+        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+num_actions, 256)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
@@ -166,3 +166,8 @@ class A3C_ConvStackedLSTM(nn.Module):
         h0 = T.zeros(1, 1, hsize).float().to(device)
         c0 = T.zeros(1, 1, hsize).float().to(device)
         return (h0, c0)
+
+    def save_featmaps(self, obs, path, layer=5):
+        featmaps = self.encoder.features[:layer+1](obs)
+        np.save(path, featmaps)
+        
