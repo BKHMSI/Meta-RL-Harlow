@@ -18,6 +18,7 @@ import deepmind_lab as lab
 from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 from models.a3c_conv_lstm import A3C_ConvLSTM, A3C_ConvStackedLSTM
+from models.resnet_lstm import ResNet_LSTM
 
 def ensure_shared_grads(model, shared_model):
     for param, shared_param in zip(model.parameters(), 
@@ -42,7 +43,9 @@ def train(config,
     lab_env = lab.Lab("contributed/psychlab/harlow", ['RGB_INTERLEAVED'], config=task_config)
     env = HarlowWrapper(lab_env, config, rank)
 
-    if config["mode"] == "conv-vanilla":
+    if config["mode"] == "resnet":
+        agent = ResNet_LSTM(config["agent"], env.num_actions)
+    elif config["mode"] == "conv-vanilla":
         agent = A3C_ConvLSTM(config["agent"], env.num_actions)
     elif config["mode"] == "vanilla":
         agent = A3C_LSTM(config["agent"], env.num_actions)
@@ -68,20 +71,23 @@ def train(config,
     p_action, p_reward = [0]*config["task"]["num-actions"], 0
 
     print('='*50)
-    print(f"Starting Trainer {rank}")
+    print(f"Starting Worker {rank}")
     print('='*50)
 
     episode_reward = 0
-    update_counter = 0
+    update_counter = counter
     total_rewards = []
 
     while True:
 
         agent.load_state_dict(shared_model.state_dict())
         if done:
-            ht, ct = agent.get_init_states(device)
+            rnn_state = agent.get_init_states(device)
         else:
-            ht, ct = ht.detach(), ct.detach()
+            if config["agent"]["cell-type"] == "lstm":
+                rnn_state = rnn_state[0].detach(), rnn_state[1].detach()
+            else:
+                rnn_state = rnn_state.detach()
 
         values = []
         log_probs = []
@@ -90,11 +96,11 @@ def train(config,
 
         for _ in range(n_step_update):
 
-            logit, value, (ht, ct) = agent(
+            logit, value, rnn_state = agent(
                 T.tensor([state]).to(device), (
                 T.tensor([p_action]).float().to(device), 
                 T.tensor([[p_reward]]).float().to(device)), 
-                (ht, ct)
+                rnn_state
             )
 
             logit = logit.squeeze(0)
@@ -109,8 +115,8 @@ def train(config,
 
             state, reward, done, _ = env.step(int(action))
 
-            # if reward == 1:
-            #     env.snapshot()
+            # if done: 
+            #     env.save_frames(os.path.join(config["save-path"], "frames.gif"))
             #     exit()
 
             episode_reward += reward
@@ -146,7 +152,7 @@ def train(config,
                 T.tensor([state]).to(device), (
                 T.tensor([p_action]).float().to(device), 
                 T.tensor([[p_reward]]).float().to(device)), 
-                (ht, ct)
+                rnn_state
             )
             R = value.detach()
         
@@ -219,7 +225,7 @@ def train_stacked(config,
     p_action, p_reward = [0]*config["task"]["num-actions"], 0
 
     print('='*50)
-    print(f"Starting Trainer {rank}")
+    print(f"Starting Worker {rank}")
     print('='*50)
 
     episode_reward = 0
@@ -280,7 +286,7 @@ def train_stacked(config,
                 writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
     
                 episode_reward = 0
-                if env.episode_num % save_interval == 0 and rank == 0:
+                if env.episode_num % save_interval == 0:
                     T.save({
                         "state_dict": shared_model.state_dict(),
                         "avg_reward_100": avg_reward_100,

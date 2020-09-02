@@ -17,6 +17,7 @@ from Harlow_PsychLab.train import train, train_stacked
 from Harlow_PsychLab.harlow import HarlowWrapper
 from models.a3c_lstm import A3C_LSTM, A3C_StackedLSTM
 from models.a3c_conv_lstm import A3C_ConvLSTM, A3C_ConvStackedLSTM
+from models.resnet_lstm import ResNet_LSTM
 
    
 if __name__ == "__main__":
@@ -30,9 +31,9 @@ if __name__ == "__main__":
                         help='path of config file')
     parser.add_argument('--length', type=int, default=3600,
                         help='Number of steps to run the agent')
-    parser.add_argument('--width', type=int, default=84,
+    parser.add_argument('--width', type=int, default=512,
                         help='Horizontal size of the observations')
-    parser.add_argument('--height', type=int, default=84,
+    parser.add_argument('--height', type=int, default=512,
                         help='Vertical size of the observations')
     parser.add_argument('--fps', type=int, default=60,
                         help='Number of frames per second')
@@ -88,7 +89,9 @@ if __name__ == "__main__":
         ############## Start Here ##############
         print(f"> Running {config['run-title']} {config['mode']} using {config['optimizer']}")
 
-        if config["mode"] == "conv-stacked":
+        if config["mode"] == "resnet":
+            shared_model = ResNet_LSTM(config["agent"], config["task"]["num-actions"])
+        elif config["mode"] == "conv-stacked":
             shared_model = A3C_ConvStackedLSTM(config["agent"], config["task"]["num-actions"])
         elif config["mode"] == "stacked":
             shared_model = A3C_StackedLSTM(config["agent"], config["task"]["num-actions"])
@@ -113,6 +116,20 @@ if __name__ == "__main__":
         T.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         T.random.manual_seed(config["seed"])
+
+        if config["copy-encoder"]:
+            filepath = os.path.join(
+                config["save-path"], 
+                config["load-title"], 
+                f"{config['load-title']}_{config['start-episode']}.pt"
+            )
+            print(f"> Copying Encoder from {filepath}")
+            pretrained_dict = T.load(filepath, map_location=T.device(config["device"]))["state_dict"]
+            load_dict = shared_model.state_dict()
+            for k, v in pretrained_dict.items():
+                if k in "encoder": load_dict[k] = v 
+            shared_model.load_state_dict(load_dict)
+
 
         if config["resume"]:
             filepath = os.path.join(

@@ -1,9 +1,9 @@
-run-title: HSE_5
+run-title: Harlow_Final_GRU
 load-title: HarlowSimple_3_1
-seed: 1234
-device: cpu
+seed: 42
+device: cuda
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
-log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_ep_2
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs_final_gru
 load-path: ckpt/HarlowSimple_11_1/HarlowSimple_11_1_0_5000.pt
 save-interval: 500
 resume: false
@@ -11,19 +11,21 @@ start-episode: 0
 optimizer: rmsprop # {rmsprop, adam}
 train: true
 test: true
-mode: episodic # {vanilla, stacked, episodic, conv-stacked}
+mode: vanilla # {vanilla, stacked, episodic, conv-stacked}
 
 task:
   max-length: 250
   num-trials: 6
-  num-actions: 3
+  num-actions: 2
   input-dim: 13
 
-  train-episodes: 2500 
+  train-episodes: 2000 
   test-episodes: 500
 
 agent:
   mem-units: 256
+
+  cell-type: gru
 
   dict-len: 10_000
   dict-kernel: cosine

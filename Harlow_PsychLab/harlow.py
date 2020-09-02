@@ -13,6 +13,10 @@ class HarlowWrapper:
       env (deepmind_lab.Lab): DeepMind Lab environment.
   """
   def __init__(self, env, config, rank):
+
+    self.imagenet_mean = [0.485, 0.456, 0.406]
+    self.imagenet_std  = [0.229, 0.224, 0.225]
+
     self.env = env
     self.max_length = config["task"]["max-length"]
     self.num_trials = config["task"]["num-trials"]
@@ -25,6 +29,10 @@ class HarlowWrapper:
     self.episode_num = config["start-episode"]
     self.trial_num = 0
     self.reset()
+
+    self.mode = config["mode"]
+    self.prev_reward = 0
+    self.f_counter = 0
 
   def step(self, action, repeat=4):
     '''
@@ -43,8 +51,13 @@ class HarlowWrapper:
 
     if reward in [-5, 5]:
       self.trial_num += 1
-
+  
     reward = self._return_reward(reward) 
+    self.prev_reward = reward
+
+    last_frame = obs['RGB_INTERLEAVED']
+    if (last_frame==0).sum() < 4900:
+      reward = -2
 
     timestep = self.num_steps() 
     done = not self.env.is_running() or timestep > self.max_length or self.trial_num >= self.num_trials
@@ -58,7 +71,7 @@ class HarlowWrapper:
     if len(self.frames) > 0:
         self.episode_num += 1
 
-    if self.episode_num > 0 and len(self.frames) > 0 and self.rank == 0 and (self.episode_num % self.save_interval) == 0:
+    if self.episode_num > 0 and len(self.frames) > 0 and (self.episode_num % self.save_interval) == 0:
       filepath = self.save_path.format(epi=self.episode_num)
       imageio.mimsave(filepath, self.frames)
 
@@ -69,18 +82,21 @@ class HarlowWrapper:
   def num_steps(self):
     return self.env.num_steps()
 
-  def snapshot(self):
+  def snapshot(self, filepath=None):
     obs = self.env.observations()['RGB_INTERLEAVED']
-    filepath = os.path.join(os.path.dirname(self.save_path), "snapshot.png")
+    if filepath is None:
+      filepath = os.path.join(os.path.dirname(self.save_path), "snapshot.png")
     imageio.imsave(filepath, obs)
 
   def save_frames(self, path):
-      imageio.mimsave(path, self.frames)
+    imageio.mimsave(path, self.frames)
 
   def _preprocess(self, obs):
     obs = obs.astype(np.float32)
     obs = obs / 255.0
-    obs = (obs - 0.5) / 0.5
+    # obs = (obs - 0.5) / 0.5
+    # obs = obs - self.imagenet_mean
+    # obs = obs / self.imagenet_std
     return np.einsum('ijk->kij', obs)
 
   def _return_reward(self, reward):
@@ -101,5 +117,9 @@ class HarlowWrapper:
     """
     # map_actions = [0, PIXELS_PER_ACTION, -PIXELS_PER_ACTION]
     # map_actions = [0, 2, -2, 2, -2, 3, -3]
-    map_actions = [4.4, -4.4]
+    # map_actions = [4.4, -4.4]
+    speed = 5
+    if self.prev_reward != 0: 
+      speed = 30
+    map_actions = [speed, -speed]
     return np.array([map_actions[action],0,0,0,0,0,0], dtype=np.intc)

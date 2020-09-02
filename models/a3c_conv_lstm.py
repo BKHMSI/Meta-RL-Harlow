@@ -60,19 +60,17 @@ class A3C_ConvLSTM(nn.Module):
             # for i, (k, v) in enumerate(pretrained_dict.items()): print(i, k, v.size())
             pretrained_dict = {
                 k: v for i, (k, v) in enumerate(pretrained_dict.items()) 
-                if i < 20
+                if i < 24
             }
             self.encoder.load_state_dict(pretrained_dict)
 
-        # self.last_conv = make_layers(
-        #     [(2*config["conv-nchannels"], 0), 'M'], 
-        #     batch_norm=True,
-        #     in_channels=4*config["conv-nchannels"]
-        # )
+        for param in self.encoder.parameters():
+            param.requires_grad = False 
+
+        self.working_memory = nn.LSTM(2048+1+num_actions, config["mem-units"])
 
         self.actor = nn.Linear(config["mem-units"], num_actions)
         self.critic = nn.Linear(config["mem-units"], 1)
-        self.working_memory = nn.LSTM(4096+4, config["mem-units"])
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)
@@ -82,15 +80,13 @@ class A3C_ConvLSTM(nn.Module):
 
     def forward(self, obs, p_input, mem_state=None):
 
-        p_action, p_reward = p_input
-
         if mem_state is None:
             mem_state = self.get_init_states(layer=1)
 
-        feats = self.last_conv(self.encoder(obs))
-        feats = feats.view(1, feats.size(0), -1)
+        feats = self.encoder(obs)
+        feats = feats.view(feats.size(0), -1)
 
-        mem_input = T.cat((feats, *p_input), dim=-1)
+        mem_input = T.cat((feats, *p_input), dim=-1).unsqueeze(0)
         h_t, mem_state = self.working_memory(mem_input, mem_state)
         
         action_logits = self.actor(h_t)
@@ -120,10 +116,13 @@ class A3C_ConvStackedLSTM(nn.Module):
             }
             self.encoder.load_state_dict(pretrained_dict)
 
-        self.actor = nn.Linear(256, num_actions)
-        self.critic = nn.Linear(256, 1)
+        for param in self.encoder.parameters():
+            param.requires_grad = False 
+
+        self.actor = nn.Linear(128, num_actions)
+        self.critic = nn.Linear(128, 1)
         self.lstm_1 = nn.LSTM(2048+1, config["mem-units"])
-        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+num_actions, 256)
+        self.lstm_2 = nn.LSTM(2048+config["mem-units"]+num_actions, 128)
         
         # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight.data, 0.01)

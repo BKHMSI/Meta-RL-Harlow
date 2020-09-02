@@ -5,22 +5,30 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-from models.dnd import DND
-from models.ep_lstm import EpLSTM
+from models.rgu import RGUnit
+
+CELLS = {
+    'lstm': nn.LSTM,
+    'gru': nn.GRU,
+    'rgu': RGUnit
+}
 
 class A3C_LSTM(nn.Module):
 
-    def __init__(self, input_dim, hidden_size, num_actions):
+    def __init__(self, input_dim, hidden_size, num_actions, cell_type="lstm"):
         super(A3C_LSTM, self).__init__()
 
         self.encoder = nn.Sequential(
-            nn.Linear(9, 32),
+            nn.Linear(9, 64),
             nn.ReLU(),
-            nn.Linear(32, 64),
+            nn.Linear(64, 128),
             nn.ReLU(),
         )
 
-        self.working_memory = nn.LSTM(64+4, hidden_size)
+        rnn = CELLS[cell_type]
+        self.cell_type = cell_type
+
+        self.working_memory = rnn(128+num_actions+1, hidden_size)
         
         self.actor = nn.Linear(hidden_size, num_actions)
         self.critic = nn.Linear(hidden_size, 1)
@@ -51,105 +59,70 @@ class A3C_LSTM(nn.Module):
     def get_init_states(self, device='cpu'):
         h0 = T.zeros(1, 1, self.working_memory.hidden_size).float().to(device)
         c0 = T.zeros(1, 1, self.working_memory.hidden_size).float().to(device)
-        return (h0, c0)
+        return (h0, c0) if self.cell_type in ["lstm", "rgu"] else h0
 
-class A3C_DND_LSTM(nn.Module):
+
+class A3C_StackedLSTM(nn.Module):
 
     def __init__(self, 
             input_dim, 
             hidden_dim, 
             num_actions,
-            dict_key_dim,
-            dict_len,
-            kernel='l2', 
-            bias=True,
             device="cpu",
     ):
-        super(A3C_DND_LSTM, self).__init__()
+        super(A3C_StackedLSTM, self).__init__()
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
-        self.bias = bias
         self.device = device 
 
+        feat_dim = 128
+
         self.encoder = nn.Sequential(
-            nn.Linear(9, 32),
+            nn.Linear(9, 64),
             nn.ReLU(),
-            nn.Linear(32, 64),
+            nn.Linear(64, feat_dim),
             nn.ReLU(),
         )
-
-        # long-term memory 
-        self.dnd = DND(dict_len, dict_key_dim, hidden_dim, kernel)
 
         # short-term memory
-        self.ep_lstm = EpLSTM(
-            input_size=64+4,
-            hidden_size=hidden_dim,
-            num_layers=1,
-            batch_first=False
-        )
+        # self.lstm_1 = nn.LSTM(feat_dim+1, hidden_dim)
+        # self.lstm_2 = nn.LSTM(feat_dim+num_actions+hidden_dim, hidden_dim // 2)
         
-        self.actor = nn.Linear(hidden_dim, num_actions)
+        self.lstm_1 = nn.LSTM(feat_dim, hidden_dim)
+        self.lstm_2 = nn.LSTM(hidden_dim+1+num_actions, hidden_dim)
+
+        self.actor  = nn.Linear(hidden_dim, num_actions)
         self.critic = nn.Linear(hidden_dim, 1)
 
         self.reset_parameters()
 
     def reset_parameters(self):
-        # reset lstm parameters
-        self.ep_lstm.reset_parameters()
-        # reset dnd 
-        self.reset_memory()
-        # intialize actor and critic weights
         T.nn.init.orthogonal_(self.actor.weight, gain=0.01)
         self.actor.bias.data.fill_(0)
         T.nn.init.orthogonal_(self.critic.weight, gain=1.0)
         self.critic.bias.data.fill_(0)
 
-    def forward(self, obs, p_input, mem_state, cue=None):
+    def forward(self, obs, p_input, state_1, state_2):
 
+        p_action, p_reward = p_input
+        
         feats = self.encoder(obs)
-        x_t = T.cat((feats, *p_input), dim=-1)
-
-        if cue is None:
-            m_t = self.dnd.get_memory(feats).to(self.device)
-        else:
-            m_t = self.dnd.get_memory(cue).to(self.device)
+        # x_t1 = T.cat((feats, p_reward), dim=-1).unsqueeze(1)
+        # x_t1 = T.cat((feats, p_action, p_reward), dim=-1).unsqueeze(1)
     
-        _, (h_t, c_t) = self.ep_lstm((x_t.unsqueeze(1), m_t.unsqueeze(1)), mem_state)
+        _, (h_t1, c_t1) = self.lstm_1(feats.unsqueeze(1), state_1)
 
-        action_logits = self.actor(h_t)
-        value_estimate = self.critic(h_t)
+        x_t2 = T.cat((h_t1.squeeze(0), p_reward, p_action), dim=-1).unsqueeze(1)
 
-        return action_logits, value_estimate, (h_t, c_t), feats
+        _, (h_t2, c_t2) = self.lstm_2(x_t2, state_2) 
 
-    def get_init_states(self):
-        h0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(self.device)
-        c0 = T.zeros(1, 1, self.ep_lstm.hidden_size).float().to(self.device)
+        action_logits  = self.actor(h_t2)
+        value_estimate = self.critic(h_t2)
+
+        return action_logits, value_estimate, (h_t1, c_t1), (h_t2, c_t2)
+
+    def get_init_states(self, layer=1):
+        hidden_size = self.lstm_1.hidden_size if layer == 1 else self.lstm_2.hidden_size
+        h0 = T.zeros(1, 1, hidden_size).float().to(self.device)
+        c0 = T.zeros(1, 1, hidden_size).float().to(self.device)
         return (h0, c0)
-
-    def turn_off_encoding(self):
-        self.dnd.encoding_off = True
-
-    def turn_on_encoding(self):
-        self.dnd.encoding_off = False
-
-    def turn_off_retrieval(self):
-        self.dnd.retrieval_off = True
-
-    def turn_on_retrieval(self):
-        self.dnd.retrieval_off = False
-
-    def reset_memory(self):
-        self.dnd.reset_memory()
-
-    def save_memory(self, mem_key, mem_val):
-        self.dnd.save_memory(mem_key, mem_val, replace_similar=True, threshold=0.9)
-
-    def retrieve_memory(self, query_key):
-        return self.dnd.get_memory(query_key)
-
-    def get_all_mems(self):
-        n_mems = len(self.dnd.keys)
-        K = [self.dnd.keys[i] for i in range(n_mems)]
-        V = [self.dnd.vals[i] for i in range(n_mems)]
-        return K, V

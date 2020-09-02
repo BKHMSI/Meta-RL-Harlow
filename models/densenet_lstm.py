@@ -14,14 +14,6 @@ class Encoder(nn.Module):
         for param in self.parameters():
             param.requires_grad = False
 
-        # for param in self.features[0].denseblock2.parameters():
-        #     param.requires_grad = True
-        # for param in self.features[0].denseblock3.parameters():
-        #     param.requires_grad = True
-
-        for param in self.features[0].denseblock4.parameters():
-            param.requires_grad = True
-
     def forward(self, x):
         x = self.features(x)
         x = F.relu(x, inplace=True)

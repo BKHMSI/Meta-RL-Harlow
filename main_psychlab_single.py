@@ -170,15 +170,12 @@ if __name__ == "__main__":
 
         episode_reward = 0
         total_rewards = []
-
         while True:
 
             if done:
-                ht1, ct1 = agent.get_init_states(1, device)
-                ht2, ct2 = agent.get_init_states(2, device)
+                ht, ct = agent.get_init_states(device)
             else:
-                ht1, ct1 = ht1.detach(), ct1.detach()
-                ht2, ct2 = ht2.detach(), ct2.detach()
+                ht, ct = ht.detach(), ct.detach()
 
             values = []
             log_probs = []
@@ -187,11 +184,11 @@ if __name__ == "__main__":
 
             for _ in range(n_step_update):
 
-                logit, value, (ht1, ct1), (ht2, ct2) = agent(
-                    T.tensor([state]).float().to(device), (
+                logit, value, (ht, ct) = agent(
+                    T.tensor([state]).to(device), (
                     T.tensor([p_action]).float().to(device), 
                     T.tensor([[p_reward]]).float().to(device)), 
-                    (ht1, ct1), (ht2, ct2)
+                    (ht, ct)
                 )
 
                 logit = logit.squeeze(0)
@@ -205,6 +202,10 @@ if __name__ == "__main__":
                 log_prob = log_prob.gather(1, action)
 
                 state, reward, done, _ = env.step(int(action))
+
+                # if reward == 1:
+                #     env.snapshot()
+                #     exit()
 
                 episode_reward += reward
 
@@ -222,7 +223,7 @@ if __name__ == "__main__":
                     avg_reward_100 = np.array(total_rewards[-100:]).mean()
                     writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
                     writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
-        
+
                     episode_reward = 0
                     if env.episode_num % save_interval == 0:
                         T.save({
@@ -232,14 +233,14 @@ if __name__ == "__main__":
                         }, save_path.format(epi=env.episode_num) + ".pt")
 
                     break 
-            
+
             R = T.zeros(1, 1).to(device)
             if not done:
-                _, value, _, _ = agent(
-                    T.tensor([state]).float().to(device), (
+                _, value, _ = agent(
+                    T.tensor([state]).to(device), (
                     T.tensor([p_action]).float().to(device), 
                     T.tensor([[p_reward]]).float().to(device)), 
-                    (ht1, ct1), (ht2, ct2)
+                    (ht, ct)
                 )
                 R = value.detach()
             
@@ -268,6 +269,104 @@ if __name__ == "__main__":
 
             update_counter += 1
             writer.add_scalar("losses/total_loss", loss.item(), update_counter)
+
+        # while True:
+
+        #     if done:
+        #         ht1, ct1 = agent.get_init_states(1, device)
+        #         ht2, ct2 = agent.get_init_states(2, device)
+        #     else:
+        #         ht1, ct1 = ht1.detach(), ct1.detach()
+        #         ht2, ct2 = ht2.detach(), ct2.detach()
+
+        #     values = []
+        #     log_probs = []
+        #     rewards = []
+        #     entropies = []
+
+        #     for _ in range(n_step_update):
+
+        #         logit, value, (ht1, ct1), (ht2, ct2) = agent(
+        #             T.tensor([state]).float().to(device), (
+        #             T.tensor([p_action]).float().to(device), 
+        #             T.tensor([[p_reward]]).float().to(device)), 
+        #             (ht1, ct1), (ht2, ct2)
+        #         )
+
+        #         logit = logit.squeeze(0)
+
+        #         prob = F.softmax(logit, dim=-1)
+        #         log_prob = F.log_softmax(logit, dim=-1)
+        #         entropy = -(log_prob * prob).sum(1, keepdim=True)
+        #         entropies += [entropy]
+        #         action = prob.multinomial(num_samples=1).detach()
+
+        #         log_prob = log_prob.gather(1, action)
+
+        #         state, reward, done, _ = env.step(int(action))
+
+        #         episode_reward += reward
+
+        #         p_action = np.eye(env.num_actions)[int(action)]
+        #         p_reward = reward
+                
+        #         log_probs += [log_prob]
+        #         values += [value]
+        #         rewards += [reward]
+
+        #         if done:
+        #             state = env.reset()
+        #             total_rewards += [episode_reward]
+                    
+        #             avg_reward_100 = np.array(total_rewards[-100:]).mean()
+        #             writer.add_scalar("perf/reward_t", episode_reward, env.episode_num)
+        #             writer.add_scalar("perf/avg_reward_100", avg_reward_100, env.episode_num)
+        
+        #             episode_reward = 0
+        #             if env.episode_num % save_interval == 0:
+        #                 T.save({
+        #                     "state_dict": agent.state_dict(),
+        #                     "avg_reward_100": avg_reward_100,
+        #                     "update_counter": update_counter
+        #                 }, save_path.format(epi=env.episode_num) + ".pt")
+
+        #             break 
+            
+        #     R = T.zeros(1, 1).to(device)
+        #     if not done:
+        #         _, value, _, _ = agent(
+        #             T.tensor([state]).float().to(device), (
+        #             T.tensor([p_action]).float().to(device), 
+        #             T.tensor([[p_reward]]).float().to(device)), 
+        #             (ht1, ct1), (ht2, ct2)
+        #         )
+        #         R = value.detach()
+            
+        #     values += [R]
+
+        #     policy_loss = 0
+        #     value_loss = 0
+        #     gae = T.zeros(1, 1).to(device)
+
+        #     for i in reversed(range(len(rewards))):
+        #         R = gamma * R + rewards[i]
+        #         advantage = R - values[i]
+        #         value_loss = value_loss + 0.5 * advantage.pow(2)
+                
+        #         # Generalized Advantage Estimation
+        #         delta_t = rewards[i] + gamma * values[i + 1] - values[i]
+        #         gae = gae * gamma * gae_lambda + delta_t
+
+        #         policy_loss = policy_loss - \
+        #             log_probs[i] * gae.detach() - entropy_coeff * entropies[i]
+
+        #     loss = policy_loss + val_coeff * value_loss
+        #     optimizer.zero_grad()
+        #     loss.backward()
+        #     optimizer.step()
+
+        #     update_counter += 1
+        #     writer.add_scalar("losses/total_loss", loss.item(), update_counter)
 
 
 

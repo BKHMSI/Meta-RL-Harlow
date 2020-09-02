@@ -1,19 +1,19 @@
-run-title: Harlow_48
-load-title: Harlow_48_1
-seed: 1
+run-title: Harlow_72
+load-title: Harlow_72_1
+seed: 42
 device: cuda
 save-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/ckpt
-log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs/logs_48
+log-path: /home/bkhmsi/Documents/Projects/lab/Meta-RL-Harlow/logs/logs_72
 save-interval: 100
 resume: true
 copy-encoder: false
 freeze-encoder: false
-start-episode: 550
+start-episode: 87400
 optimizer: rmsprop # {rmsprop, adam}
 train: true
 test: true
-mode: densenet-stacked # {vanilla, stacked, conv-vanilla, conv-stacked, densenet-stacked}
-desc: 2 actions only, densenet same as run 45 (denseblock4 made trainable) but with different seed
+mode: resnet # {vanilla, stacked, conv-vanilla, conv-stacked, densenet-stacked}
+desc: continue 71
 
 task:
   imsize: 34
@@ -33,14 +33,16 @@ agent:
   mem-units: 512
   conv-nchannels: 128
 
+  cell-type: lstm
+
   dict-len: 100_000
   dict-kernel: cosine
 
-  n-workers: 1
+  n-workers: 4
   share-optim: true
   
   value-loss-weight: 0.4
-  entropy-weight: 0.001
+  entropy-weight: 0.01 # this was 0.005, 0.001
   max-grad-norm: 0.
   
   gae-lambda: 1.
@@ -48,5 +50,5 @@ agent:
   lr: 7.5e-4
   weight-decay: 0
 
-  n-step-update: 112 # lstm-unroll
+  n-step-update: 100 # lstm-unroll (was 112)
 

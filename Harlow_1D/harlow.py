@@ -25,7 +25,7 @@ class Harlow_1D:
         '''environment constants'''
         self.max_length = 250
         self.n_trials   = 6
-        self.n_actions  = 3 
+        self.n_actions  = 2
         self.n_objects  = 1000
         self.n_episodes = 2500
         self.state_len  = 17 # size of state
@@ -34,7 +34,7 @@ class Harlow_1D:
         self.fix_reward = 0.2
         self.obj_reward = 1
         self.time_step  = 0
-        self.map_action = [0, 1, -1]
+        self.map_action = [1, -1]
 
         self.episode_num = 0
         self.verbose = verbose 

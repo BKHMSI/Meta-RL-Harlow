@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 
-path = "./featmaps_7500_5.npy"
+path = "featmaps/featmaps_7500_5.npy"
 featmaps = np.load(path)
 
 rand_idxs = np.random.randint(0,featmaps.shape[1], 5)
